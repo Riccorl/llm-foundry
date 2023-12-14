@@ -7,7 +7,6 @@
 #SBATCH --cpus-per-task=8       # number of threads per task
 #SBATCH --time 4:00:00          # format: HH:MM:SS
 
-#SBATCH -p normal
 #SBATCH -A IscrB_medit
 
 module load autoload profile/deeplrn culturax/2309
