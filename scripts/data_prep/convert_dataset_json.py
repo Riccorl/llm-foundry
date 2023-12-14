@@ -206,7 +206,7 @@ def main(args: Namespace) -> None:
         # we also want to count the number of tokens for the progress bar
             progress_bar = tqdm(total=args.max_tokens)
             for sample in tqdm(dataset):
-                progress_bar.update(len(sample.pop("num_tokens")))
+                progress_bar.update(sample.pop("num_tokens"))
                 out.write(sample)
                 if progress_bar.n >= args.max_tokens:
                     break
