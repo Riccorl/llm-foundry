@@ -34,17 +34,16 @@ format. We'll structure prompts and responses like this:
 from typing import Dict, List, Union
 
 
-def multiple_choice(
-        inp: Dict[str, Union[str, List[str], int]]) -> Dict[str, str]:
-    PROMPT_FORMAT = '{query}\nOptions:{options}\nAnswer: '
-    options = ''
-    assert isinstance(inp['choices'], List)
-    for option in inp['choices']:
-        options += f'\n - {option}'
-    query = inp['query']
+def multiple_choice(inp: Dict[str, Union[str, List[str], int]]) -> Dict[str, str]:
+    PROMPT_FORMAT = "{query}\nOptions:{options}\nAnswer: "
+    options = ""
+    assert isinstance(inp["choices"], List)
+    for option in inp["choices"]:
+        options += f"\n - {option}"
+    query = inp["query"]
 
-    assert isinstance(inp['gold'], int)
+    assert isinstance(inp["gold"], int)
     return {
-        'prompt': PROMPT_FORMAT.format(query=query, options=options),
-        'response': inp['choices'][inp['gold']],
+        "prompt": PROMPT_FORMAT.format(query=query, options=options),
+        "response": inp["choices"][inp["gold"]],
     }
