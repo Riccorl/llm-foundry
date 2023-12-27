@@ -17,7 +17,118 @@ from omegaconf import DictConfig
 from omegaconf import OmegaConf as om
 from streaming import Stream, StreamingDataset
 from torch.utils.data import DataLoader
-from transformers import PreTrainedTokenizerBase
+from transformers import PreTrainedTokenizerBase, AutoTokenizer
+
+from typing import Any, Dict, Iterator, Optional
+from transformers import BatchEncoding, BatchFeature
+
+
+# COPIED FROM THE DOCUMENTATION        
+class StreamingDataLoader(DataLoader):
+    """A streaming data loader.
+
+    Provides an additional checkpoint/resumption interface, for which it tracks the number of
+    samples seen by the model this rank.
+
+    Args:
+        *args: List arguments.
+        **kwargs: Keyword arguments.
+    """
+
+    def __init__(self, *args, start_length = 8, max_length = 128, max_t = 4000, **kwargs) -> None:  # pyright: ignore
+        super().__init__(*args, **kwargs)
+        self.num_samples_yielded = 0
+
+        self.start_length = start_length
+        self.max_length = max_length
+        self.max_t = max_t
+
+    def _get_batch_size(self, batch: Any) -> int:
+        """Get the number of samples in a batch.
+
+        Args:
+            batch (Any): The batch.
+
+        Returns:
+            int: Number of samples.
+        """
+        if isinstance(batch, (dict, BatchEncoding, BatchFeature)):
+            for value in batch.values():
+                return len(value)
+            raise ValueError('Batch is empty')
+        elif isinstance(batch, Tensor):
+            return len(batch)
+        else:
+            return len(batch[0])
+
+    def __iter__(self) -> Iterator[Any]:
+        # TODO: here change the max_seq_len proportionally to the number of step reached
+        # understand if this instance of StreamingDataset do thread-safe operations
+        # one instance per node, multiple call per batch?
+
+        """
+        At each training step, our method uses pacing function to determine the sequence length and then truncates 
+        the full-length sequences to obtain a
+        modified version of the mini-batch for training. It is true that this truncation-based implementation
+        will drop some data in the current step. However, with some implementation changes, it’s possible to
+        record the index of dropped data and use them in future steps.
+        """
+
+        """Iterate over this DataLoader, yielding batches.
+
+        Also tracks the number of samples seen this rank.
+
+        Returns:
+            Iterator[Any]: Each batch.
+        """
+        self.num_samples_yielded = 0
+        step = 0
+
+        for batch in super().__iter__():
+            self.num_samples_yielded += self._get_batch_size(batch)
+
+            actual_length = self.start_length + int((self.max_length - self.start_length)*np.min([step/self.max_t, 1]))
+
+            batch["input_ids"] = batch["input_ids"][:, :actual_length]
+            batch["labels"] = batch["labels"][:, :actual_length]
+
+            step += 1
+
+            yield batch
+
+    def state_dict(self) -> Optional[Dict[str, Any]]:
+        """Get a dict containing training state (called from non-worker process).
+
+        This is called on rank zero.
+
+        Args:
+            samples_in_epoch (int): The number of samples processed so far in the current epoch.
+
+        Returns:
+            Optional[Dict[str, Any]]: The state, if a streaming dataset.
+        """
+        if isinstance(self.dataset, StreamingDataset):
+            world = World()
+            num_samples = self.num_samples_yielded * world.num_ranks
+            return self.dataset.state_dict(num_samples, False)
+        return None
+
+    def load_state_dict(self, obj: Dict[str, Any]) -> None:
+        """Load a dict containing training state (called from non-worker process).
+
+        This is called on each copy of the dataset when resuming.
+
+        Args:
+            obj (Dict[str, Any]): The state.
+        """
+        if isinstance(self.dataset, StreamingDataset):
+            self.dataset.load_state_dict(obj)
+
+    def __del__(self) -> None:
+        """Terminate the workers during cleanup."""
+        if self._iterator is not None:
+            self._iterator._shutdown_workers()  # type: ignore [reportGeneralTypeIssues]
+
 
 
 class StreamingTextDataset(StreamingDataset):
@@ -258,6 +369,10 @@ def build_text_dataloader(
     eos_token_id = cfg.dataset.pop('eos_token_id', None)
     bos_token_id = cfg.dataset.pop('bos_token_id', None)
 
+    # get ss args
+    start_length = cfg.dataset.pop('start_length', None)
+    max_t = cfg.dataset.pop('max_t', None)
+
     # build streams
     streams = None
     if streams_dict is not None:
@@ -287,10 +402,13 @@ def build_text_dataloader(
             eos_token_id=eos_token_id,
             bos_token_id=bos_token_id)
 
-    dl = DataLoader(
+    dl = StreamingDataLoader(
         dataset,
+        start_length = start_length,
+        max_length = cfg.dataset.max_seq_len,
+        max_t = max_t,
         collate_fn=collate_fn,
-        batch_size=device_batch_size,
+        batch_size=device_batch_size, # batch per device
         drop_last=cfg.drop_last,
         num_workers=cfg.num_workers,
         pin_memory=cfg.get('pin_memory', True),
@@ -394,9 +512,12 @@ if __name__ == '__main__':
             'local': args.local_path,
             'remote': args.remote_path,
             'split': args.split,
-            'shuffle': False,
+            'shuffle': True,
             'max_seq_len': args.max_seq_len,
             'keep_zip': True,  # in case we need compressed files after testing
+            # Stability_efficiency params
+            'start_length': 8,
+            'max_t': 5,
         },
         'drop_last': False,
         'num_workers': 4,
