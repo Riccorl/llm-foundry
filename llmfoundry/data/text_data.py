@@ -84,17 +84,29 @@ class StreamingDataLoader(DataLoader):
         self.num_samples_yielded = 0
         step = 0
 
+        # TODO: The cutted elements can be used in the following yielding ...
+        ## Understand how this can be used with padding
         for batch in super().__iter__():
             self.num_samples_yielded += self._get_batch_size(batch)
 
             actual_length = self.start_length + int((self.max_length - self.start_length)*np.min([step/self.max_t, 1]))
 
-            batch["input_ids"] = batch["input_ids"][:, :actual_length]
-            batch["labels"] = batch["labels"][:, :actual_length]
+            # flush out the batch until less than "actual_length" tokens are left
+            while batch["input_ids"].size(1) >= actual_length:
 
-            step += 1
+                actual_batch = {}
 
-            yield batch
+                actual_batch["input_ids"] = batch["input_ids"][:, :actual_length]
+                actual_batch["labels"] = batch["labels"][:, :actual_length]
+
+                batch["input_ids"] = batch["input_ids"][:, actual_length:]
+                batch["labels"] = batch["labels"][:, actual_length:]
+
+                step += 1
+
+                actual_length = self.start_length + int((self.max_length - self.start_length)*np.min([step/self.max_t, 1]))
+
+                yield actual_batch
 
     def state_dict(self) -> Optional[Dict[str, Any]]:
         """Get a dict containing training state (called from non-worker process).
@@ -284,6 +296,9 @@ class StreamingTextDataset(StreamingDataset):
 
     def _read_binary_tokenized_sample(self, sample: Dict[str,
                                                          Any]) -> torch.Tensor:
+
+        # Following the riccorl approach seems that we are dealing with already tokenized data
+        # we can split and mantain the removed tokens for further yieldings (avoid removing too much tokens)
         return torch.from_numpy(
             np.frombuffer(sample['tokens'],
                           dtype=np.int64)[:self.max_seq_len].copy())
@@ -467,12 +482,34 @@ def get_tokens_per_batch_func(
     return get_num_samples_in_batch
 
 
+
+def build_tokenizer(
+        tokenizer_name: str,
+        tokenizer_kwargs: Dict[str, Any]) -> PreTrainedTokenizerBase:
+    os.environ['TRANSFORMERS_NO_ADVISORY_WARNINGS'] = '1'
+    os.environ['TOKENIZERS_PARALLELISM'] = 'false'
+
+    if tokenizer_name.startswith('tiktoken'):
+        tokenizer = TiktokenTokenizerWrapper(**tokenizer_kwargs)
+    else:
+        tokenizer = AutoTokenizer.from_pretrained(tokenizer_name,
+                                                  **tokenizer_kwargs)
+
+        # HuggingFace does not respect the model_max_length kwarg, and overrides it with
+        # min(kwargs['model_max_length'], original_config['model_max_length']), so we
+        # explicitly set it here
+        tokenizer.model_max_length = tokenizer_kwargs.get(
+            'model_max_length',
+            int(1e30),
+        )
+
+    return tokenizer
+
+
 # Helpful to test if your dataloader is working locally
 # Run `python data.py  --local_path [local] [--remote_path remote, optional]` and verify that batches are printed out
 if __name__ == '__main__':
     import argparse
-
-    from llmfoundry.utils.builders import build_tokenizer
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--tokenizer',
