@@ -35,10 +35,11 @@ class StreamingDataLoader(DataLoader):
         **kwargs: Keyword arguments.
     """
 
-    def __init__(self, *args, start_length = 8, max_length = 128, max_t = 4000, **kwargs) -> None:  # pyright: ignore
+    def __init__(self, *args, pad_token = None, start_length = 8, max_length = 128, max_t = 4000, **kwargs) -> None:  # pyright: ignore
         super().__init__(*args, **kwargs)
         self.num_samples_yielded = 0
 
+        self.pad_token = pad_token
         self.start_length = start_length
         self.max_length = max_length
         self.max_t = max_t
@@ -107,6 +108,23 @@ class StreamingDataLoader(DataLoader):
                 actual_length = self.start_length + int((self.max_length - self.start_length)*np.min([step/self.max_t, 1]))
 
                 yield actual_batch
+
+            if batch["input_ids"].size(1) > 1:
+                pad_size = actual_length - batch["input_ids"].size(1)
+                bs = batch["input_ids"].size(0)
+
+                print(batch["input_ids"].shape)
+                print((bs, pad_size))
+
+                batch["input_ids"] = torch.cat([batch["input_ids"], torch.full((bs, pad_size), self.pad_token)], axis=1)
+                batch["labels"] = torch.cat([batch["labels"], torch.full((bs, pad_size), self.pad_token)], axis=1) 
+
+                step += 1
+
+                actual_length = self.start_length + int((self.max_length - self.start_length)*np.min([step/self.max_t, 1]))
+
+                yield batch
+
 
     def state_dict(self) -> Optional[Dict[str, Any]]:
         """Get a dict containing training state (called from non-worker process).
@@ -419,6 +437,7 @@ def build_text_dataloader(
 
     dl = StreamingDataLoader(
         dataset,
+        pad_token = tokenizer.pad_token_id if tokenizer.pad_token_id is not None else tokenizer.eos_token_id,
         start_length = start_length,
         max_length = cfg.dataset.max_seq_len,
         max_t = max_t,
@@ -480,30 +499,6 @@ def get_tokens_per_batch_func(
         return input_ids_tokens + decoder_input_ids_tokens
 
     return get_num_samples_in_batch
-
-
-
-def build_tokenizer(
-        tokenizer_name: str,
-        tokenizer_kwargs: Dict[str, Any]) -> PreTrainedTokenizerBase:
-    os.environ['TRANSFORMERS_NO_ADVISORY_WARNINGS'] = '1'
-    os.environ['TOKENIZERS_PARALLELISM'] = 'false'
-
-    if tokenizer_name.startswith('tiktoken'):
-        tokenizer = TiktokenTokenizerWrapper(**tokenizer_kwargs)
-    else:
-        tokenizer = AutoTokenizer.from_pretrained(tokenizer_name,
-                                                  **tokenizer_kwargs)
-
-        # HuggingFace does not respect the model_max_length kwarg, and overrides it with
-        # min(kwargs['model_max_length'], original_config['model_max_length']), so we
-        # explicitly set it here
-        tokenizer.model_max_length = tokenizer_kwargs.get(
-            'model_max_length',
-            int(1e30),
-        )
-
-    return tokenizer
 
 
 # Helpful to test if your dataloader is working locally
