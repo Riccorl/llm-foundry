@@ -172,6 +172,7 @@ class ComposerHFCausalLM(HuggingFaceModelWithZLoss):
                             trust_remote_code=trust_remote_code,
                             use_auth_token=use_auth_token,
                             config=config,
+                            attn_implementation="flash_attention_2" if use_flash_attention_2 else None,
                         )
 
             dist.barrier()

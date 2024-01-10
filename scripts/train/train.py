@@ -9,6 +9,7 @@ import time
 import warnings
 from typing import Any, Dict, List, Optional, Union
 
+import streaming
 import torch
 from composer import Trainer
 from composer.core.callback import Callback
@@ -621,6 +622,7 @@ def main(cfg: DictConfig) -> Trainer:
 
 
 if __name__ == "__main__":
+    streaming.base.util.clean_stale_shared_memory()
     yaml_path, args_list = sys.argv[1], sys.argv[2:]
     with open(yaml_path) as f:
         yaml_cfg = om.load(f)

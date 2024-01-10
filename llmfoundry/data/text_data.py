@@ -5,6 +5,7 @@
 
 import os
 from itertools import islice
+import sys
 from typing import (Any, Callable, Dict, List, Mapping, Optional, Sequence,
                     Union, cast)
 
@@ -298,6 +299,18 @@ def build_text_dataloader(
         persistent_workers=cfg.get('persistent_workers', True),
         timeout=cfg.get('timeout', 0),
     )
+
+    # print("Logging the first batch of the dataloader")
+    # for i, batch in enumerate(dl):
+    #     print("=============")
+    #     print(batch)
+    #     print("len input_ids", len(batch['input_ids'][0]))
+    #     print("len labels", len(batch['labels'][0]))
+    #     print("max input_ids", max(batch['input_ids'][0]))
+    #     if i == 10:
+    #         break
+    #     sys.exit(0)
+    # print(next(iter(dl)))
 
     # If we pretokenized, we may not have padding, in which case the
     # tokenizer may not have a pad_token_id. In this case, we can

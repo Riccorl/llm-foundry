@@ -210,6 +210,7 @@ def build_callback(name: str, kwargs: Union[DictConfig, Dict[str,
 
 
 def build_logger(name: str, kwargs: Dict[str, Any]) -> LoggerDestination:
+    print("build_logger", name, kwargs)
     if name == 'wandb':
         return WandBLogger(**kwargs)
     elif name == 'tensorboard':

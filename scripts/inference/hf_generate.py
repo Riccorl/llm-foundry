@@ -165,8 +165,11 @@ def main(args: Namespace) -> None:
 
     # Build tokenizer
     print("\nLoading HF tokenizer...")
+    print("Tokenizer: /leonardo_work/IscrB_medit/training/checkpoints/minestral-350m-25122023")
+    print(f"Model: {args.name_or_path}")
     tokenizer = AutoTokenizer.from_pretrained(
-        args.name_or_path, **from_pretrained_kwargs
+        # args.name_or_path, **from_pretrained_kwargs
+        "/leonardo_work/IscrB_medit/training/checkpoints/minestral-350m-25122023", **from_pretrained_kwargs
     )
     if tokenizer.pad_token_id is None:
         warnings.warn(
@@ -305,6 +308,7 @@ def main(args: Namespace) -> None:
                 zip(effective_prompts, batch, decoded_gen)
             ):
                 continuation = gen[len(effective_prompt) :]
+                print("Encoded prompt:\n" + str(encoded_gen))
                 print(delimiter)
                 if len(continuation) > 0:
                     print("\033[92m" + prompt + "\033[0m" + continuation)

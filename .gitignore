@@ -2,6 +2,7 @@
 my-copy-c4*/
 my-copy-arxiv*/
 *.jsonl*
+logs/*
 
 # WandB
 wandb/

@@ -100,10 +100,13 @@ def build_hf_dataset(
     """
     if os.path.isdir(path):
         data_files = glob(f"{path}/*")
+        # order data files by name
+        data_files.sort()
     else:
         data_files = path
 
-    hf_dataset = hf_datasets.load_dataset("json", data_files=data_files, split=split)
+    print(f"Loading dataset from {data_files}")
+    hf_dataset = hf_datasets.load_dataset("json", data_files=data_files, split=split, cache_dir=False)
 
     if mode == ConcatMode.NO_CONCAT:
         dataset = NoConcatDataset(hf_dataset)
@@ -191,8 +194,6 @@ def main(args: Namespace) -> None:
         tokenizer=tokenizer,
     )
 
-    print("here")
-
     # Write samples
     print(f"Converting to MDS format...")
     print(
@@ -203,16 +204,25 @@ def main(args: Namespace) -> None:
         columns=columns, out=os.path.join(args.out_root), compression=args.compression
     ) as out:
         if args.max_tokens is not None:
-        # we also want to count the number of tokens for the progress bar
+            # we also want to count the number of tokens for the progress bar
+            processed_tokens = 0
             progress_bar = tqdm(total=args.max_tokens)
-            for sample in tqdm(dataset):
-                progress_bar.update(sample.pop("num_tokens"))
-                out.write(sample)
-                if progress_bar.n >= args.max_tokens:
-                    break
+            try:
+                for sample in tqdm(dataset):
+                    processed_tokens += sample["num_tokens"]
+                    progress_bar.update(sample.pop("num_tokens"))
+                    out.write(sample)
+                    if processed_tokens >= args.max_tokens:
+                        print("Stopping early due to --max_tokens")
+                        break
+            except Exception as e:
+                print(f"Exception: {e}")
+                print(f"Processed {processed_tokens} tokens")
         else:
             for sample in tqdm(dataset):
                 out.write(sample)
+
+    print("Done!")
 
 
 if __name__ == "__main__":
