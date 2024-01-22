@@ -20,9 +20,9 @@ source ~/llmfoundry-cuda-flash-attn2-env/bin/activate
 ~/llmfoundry-cuda-flash-attn2-env/bin/python /leonardo/home/userexternal/rorland1/llm-foundry/scripts/data_prep/extract_hf_to_jsonl_reservoir.py \
     --dataset_path /leonardo/prod/data/ai/culturax/2309/en \
     --path_to_save /leonardo_work/IscrB_medit/culturax/extracted/350M-model_reservoir/en/ \
-    --max_samples 10_000_000 --streaming --split_size 500_000
+    --max_samples 10_000_000 --split_size 500_000 --ds_split train --sources mC4 OSCAR-2301 OSCAR-2201
 
 # ~/llmfoundry-cuda-flash-attn2-env/bin/python /leonardo/home/userexternal/rorland1/llm-foundry/scripts/data_prep/extract_hf_to_jsonl_reservoir.py \
 #     --dataset_path /leonardo/prod/data/ai/culturax/2309/it \
 #     --path_to_save /leonardo_work/IscrB_medit/culturax/extracted/350M-model_reservoir/it/ \
-#     --max_samples 10_000_000 --streaming --split_size 500_000
+#     --max_samples 10_000_000 --split_size 500_000 --ds_split train --sources mC4 OSCAR-2301 OSCAR-2201
