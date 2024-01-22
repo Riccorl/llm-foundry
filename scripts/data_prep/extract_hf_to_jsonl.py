@@ -9,7 +9,6 @@ import psutil
 from datasets import Dataset, load_dataset, DatasetDict
 from huggingface_hub import login
 from tqdm import tqdm
-from random import randrange
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -17,29 +16,7 @@ logger.setLevel(logging.INFO)
 HF_CACHE = os.getenv("HF_HOME", os.path.expanduser("~/.cache/huggingface"))
 print(HF_CACHE)
 
-def reservoir_streaming(dataset, max_samples, sources):
-    reservoir_indexes = None
-
-    for ds_split in dataset:
-        reservoir_indexes = []
-        for i, sample in tqdm(enumerate(dataset[ds_split])):
-            # sample only certain resources
-            if sources is not None and sample["source"] not in sources:
-                continue
-            
-            # init the reservoir
-            if len(reservoir_indexes) < max_samples:
-                reservoir_indexes.append(i)
-                continue
-            
-            # reservoir sample
-            j = randrange(i)
-            reservoir_indexes[j] = i
-
-    # return a uniform sample of indexes
-    return reservoir_indexes
-
-def save_to_jsonl_streaming(dataset, path_to_save, split_size, max_samples=None, sources=None, sampled_indexes=None):
+def save_to_jsonl_streaming(dataset, path_to_save, split_size, max_samples=None, sources=None):
     # now we can save the dataset in jsonl format, divided in multiple files
     # we would like to parallelize this step, we can use the multiprocessing library
     dataset_path = Path(path_to_save)
@@ -53,10 +30,7 @@ def save_to_jsonl_streaming(dataset, path_to_save, split_size, max_samples=None,
         
         saved = 0
         shard_idx = 0
-        for i, sample in tqdm(enumerate(dataset[ds_split]), total=max_samples):
-            if (not sampled_indexes is None) and (not i in sampled_indexes): # random sampling, sampled_indexes is computed with reservoir sampling
-                continue
-
+        for sample in tqdm(dataset[ds_split], total=max_samples):
             if saved >= max_samples:
                 break
             if sources is not None and sample["source"] not in sources:
@@ -165,10 +139,7 @@ def main(args):
             token=True,
         )
         sources = ["mC4", "OSCAR-2301", "OSCAR-2201"]
-
-        reservoir_indexes  = reservoir_streaming(dataset, args.max_samples, sources)
-
-        save_to_jsonl_streaming(dataset, args.path_to_save, args.split_size, args.max_samples, sources, sampled_indexes=reservoir_indexes)
+        save_to_jsonl_streaming(dataset, args.path_to_save, args.split_size, args.max_samples, sources)
         # download_streaming_dataset(dataset, args)
         # TODO improve this
         # download_streaming_dataset(
