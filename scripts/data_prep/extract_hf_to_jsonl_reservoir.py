@@ -4,7 +4,7 @@ import logging
 import os
 from pathlib import Path
 import psutil
-from datasets import load_dataset
+from datasets import load_dataset, load_from_disk
 from tqdm import tqdm
 from random import randrange
 from pathlib import Path
@@ -12,7 +12,7 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-HF_CACHE = os.getenv("HF_HOME", os.path.expanduser("~/.cache/huggingface"))
+HF_CACHE = os.getenv("HF_DATASETS_CACHE", os.path.expanduser("~/.cache/huggingface"))
 URLS_FILE_NAME = "urls.json"
 
 
@@ -88,12 +88,12 @@ def main(args):
     #    login()
 
     logger.info("==== Starting download Dataset ====")
-    dataset = load_dataset(
-        path=args.dataset_path,
-        split=args.ds_split,
-        cache_dir=HF_CACHE,
-    #    token=True,
-        num_proc=psutil.cpu_count(logical=False),
+    dataset = load_from_disk(
+        args.dataset_path,
+    #     split=args.ds_split,
+    #     cache_dir=HF_CACHE,
+    #     token=True,
+    #     num_proc=psutil.cpu_count(logical=False),
     )
 
     # sources = ["mC4", "OSCAR-2301", "OSCAR-2201"]
