@@ -17,15 +17,15 @@ export HF_DATASETS_CACHE=$WORK/hf_cache
 
 source ~/llmfoundry-cuda-flash-attn2-env/bin/activate
 
-~/llmfoundry-cuda-flash-attn2-env/bin/python scripts/data_prep/convert_dataset_json.py \
-    --path $WORK/culturax/extracted/350M-model/en/train \
-    --out_root $WORK/llm-foundry/culturax/350M-model-12B-en-it/processed/en \
-    --split train --concat_tokens 2048 --tokenizer $WORK/tokenizer/trained/minestreal350m-en-it-hf \
-     --max_tokens 6_000_000_000
-
-
-# ~/llmfoundry-cuda-env/bin/python scripts/data_prep/convert_dataset_json.py \
-#     --path $WORK/culturax/extracted/350M-model/it/train \
-#     --out_root $WORK/llm-foundry/culturax/350M-model-12B-en-it/processed/it \
+# ~/llmfoundry-cuda-flash-attn2-env/bin/python scripts/data_prep/convert_dataset_json.py \
+#     --path $WORK/culturax/extracted/350M-model/en/train \
+#     --out_root $WORK/llm-foundry/culturax/350M-model-12B-en-it/processed/en \
 #     --split train --concat_tokens 2048 --tokenizer $WORK/tokenizer/trained/minestreal350m-en-it-hf \
-#     --max_tokens 6_000_000_000
+#      --max_tokens 6_000_000_000
+
+
+~/llmfoundry-cuda-env/bin/python scripts/data_prep/convert_dataset_json.py \
+    --path $WORK/culturax/extracted/350M-model/it/train \
+    --out_root $WORK/llm-foundry/culturax/350M-model-12B-en-it/processed/it \
+    --split train --concat_tokens 2048 --tokenizer $WORK/tokenizer/trained/minestreal350m-en-it-hf \
+    --max_tokens 6_000_000_000
