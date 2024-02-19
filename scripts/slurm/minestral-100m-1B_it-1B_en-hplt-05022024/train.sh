@@ -1,12 +1,13 @@
 #!/bin/bash
-#SBATCH --job-name=minestral-350m-en-it-12B-10012024-train            # Job name
-#SBATCH -o logs/minestral-350m-en-it-12B-10012024/train-job.out       # Name of stdout output file
-#SBATCH -e logs/minestral-350m-en-it-12B-10012024/train-job.err       # Name of stderr error file
+#SBATCH --job-name=minestral-100m-1B_it-1B_en-hplt-05022024-train            # Job name
+#SBATCH -o logs/minestral-100m-1B_it-1B_en-hplt-05022024/train-job.out       # Name of stdout output file
+#SBATCH -e logs/minestral-100m-1B_it-1B_en-hplt-05022024/train-job.err       # Name of stderr error file
 #SBATCH --nodes=1                       # number of nodes
 #SBATCH --ntasks-per-node=4             # number of tasks per node
 #SBATCH --cpus-per-task=8              # number of threads per task
-#SBATCH --time 24:00:00                  # format: HH:MM:SS
+#SBATCH --time 8:00:00                  # format: HH:MM:SS
 #SBATCH --gres=gpu:4                    # number of gpus per node
+#SBATCH --exclusive                     # request nodes exclusively
 
 #SBATCH -A IscrB_medit
 #SBATCH -p boost_usr_prod
@@ -23,4 +24,4 @@ export HF_TOKEN=$(cat .envs | grep HF_TOKEN | cut -d '=' -f2)
 
 source ~/llmfoundry-cuda-flash-attn2-env/bin/activate
 
-composer scripts/train/train.py scripts/train/yamls/pretrain/minestral-350m-en-it-12B.yaml
+composer scripts/train/train.py scripts/train/yamls/pretrain/minestral-100m-1B_it-1B_en-hplt-05022024.yaml

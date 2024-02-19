@@ -3,12 +3,14 @@
 
 """Datasets for converting to MDS Shards."""
 import os
+import time
 import warnings
 from typing import Dict, Iterable, Union
 
 import datasets as hf_datasets
 import numpy as np
 from torch.utils.data import IterableDataset
+from tqdm import tqdm
 from transformers import PreTrainedTokenizerBase
 
 
@@ -18,14 +20,15 @@ class NoConcatDataset(IterableDataset):
     Returns dicts of {'text': bytes}
     """
 
-    def __init__(self, hf_dataset: Union[hf_datasets.IterableDataset,
-                                         hf_datasets.Dataset]):
+    def __init__(
+        self, hf_dataset: Union[hf_datasets.IterableDataset, hf_datasets.Dataset]
+    ):
         self.hf_dataset = hf_dataset
 
     def __iter__(self) -> Iterable[Dict[str, bytes]]:
         for sample in self.hf_dataset:
             # convert to bytes to store in MDS binary format
-            yield {'text': sample['text'].encode('utf-8')}
+            yield {"text": sample["text"].encode("utf-8")}
 
 
 class ConcatTokensDataset(IterableDataset):
@@ -59,60 +62,69 @@ class ConcatTokensDataset(IterableDataset):
         bos_text: str,
         eos_text: str,
         no_wrap: bool,
+        write_batch_size: int = 10_000,
     ):
         self.hf_dataset = hf_dataset
         self.tokenizer = tokenizer
-        os.environ['TOKENIZERS_PARALLELISM'] = 'false'
+        # os.environ["TOKENIZERS_PARALLELISM"] = "false"
         self.max_length = max_length
         self.bos_text = bos_text
         self.eos_text = eos_text
         self.should_wrap = not no_wrap
+        self.write_batch_size = write_batch_size
 
-        self.bos_tokens = self.tokenizer(self.bos_text,
-                                         truncation=False,
-                                         padding=False,
-                                         add_special_tokens=False)['input_ids']
+        self.bos_tokens = self.tokenizer(
+            self.bos_text, truncation=False, padding=False, add_special_tokens=False
+        )["input_ids"]
         if len(self.bos_tokens) > 1:
             warnings.warn(
-                f'You specified --concat_tokens with --bos_text, but your BOS text is not tokenizing to one token\
-                , instead we got {self.bos_tokens}. Quit if this was in error.')
+                f"You specified --concat_tokens with --bos_text, but your BOS text is not tokenizing to one token\
+                , instead we got {self.bos_tokens}. Quit if this was in error."
+            )
 
-        self.eos_tokens = self.tokenizer(self.eos_text,
-                                         truncation=False,
-                                         padding=False,
-                                         add_special_tokens=False)['input_ids']
+        self.eos_tokens = self.tokenizer(
+            self.eos_text, truncation=False, padding=False, add_special_tokens=False
+        )["input_ids"]
         if len(self.eos_tokens) > 1:
             warnings.warn(
-                f'You specified --concat_tokens with --eos_text, but your EOS text is not tokenizing to one token\
-                , instead we got {self.eos_tokens}. Quit if this was in error.')
+                f"You specified --concat_tokens with --eos_text, but your EOS text is not tokenizing to one token\
+                , instead we got {self.eos_tokens}. Quit if this was in error."
+            )
 
-        eos_text_provided = self.eos_text != ''
-        bos_text_provided = self.bos_text != ''
-        test_text = self.tokenizer('')
-        if len(test_text['input_ids']) > 0 and (eos_text_provided or
-                                                bos_text_provided):
-            message = 'both eos and bos' if eos_text_provided and bos_text_provided else (
-                'eos_text' if eos_text_provided else 'bos_text')
+        eos_text_provided = self.eos_text != ""
+        bos_text_provided = self.bos_text != ""
+        test_text = self.tokenizer("")
+        if len(test_text["input_ids"]) > 0 and (eos_text_provided or bos_text_provided):
+            message = (
+                "both eos and bos"
+                if eos_text_provided and bos_text_provided
+                else ("eos_text" if eos_text_provided else "bos_text")
+            )
             warnings.warn(
-                f'The provided tokenizer adds special tokens, but you also specified {message}. This may result '
-                +
-                'in duplicated special tokens. Please be sure this is what you intend.'
+                f"The provided tokenizer adds special tokens, but you also specified {message}. This may result "
+                + "in duplicated special tokens. Please be sure this is what you intend."
             )
 
     def __iter__(self) -> Iterable[Dict[str, bytes]]:
 
         buffer = []
-        for sample in self.hf_dataset:
-            encoded = self.tokenizer(sample['text'],
-                                     truncation=False,
-                                     padding=False)
-            iids = encoded['input_ids']
-            buffer = buffer + self.bos_tokens + iids + self.eos_tokens
-            while len(buffer) >= self.max_length:
-                concat_sample = buffer[:self.max_length]
-                buffer = buffer[self.max_length:] if self.should_wrap else []
-                yield {
-                    # convert to bytes to store in MDS binary format
-                    'tokens': np.asarray(concat_sample).tobytes(),
-                    "num_tokens": len(concat_sample),
-                }
+        shards = self.hf_dataset.num_rows // self.write_batch_size + 1
+        for i in range(shards):
+            shard = self.hf_dataset[
+                i * self.write_batch_size : (i + 1) * self.write_batch_size
+            ]
+            encoded_shard = self.tokenizer(
+                shard["text"], truncation=False, padding=False
+            )
+            for encoded in encoded_shard["input_ids"]:
+                iids = encoded  # ['input_ids']
+                buffer = buffer + self.bos_tokens + iids + self.eos_tokens
+                while len(buffer) >= self.max_length:
+                    concat_sample = buffer[: self.max_length]
+                    buffer = buffer[self.max_length :] if self.should_wrap else []
+                    yield {
+                        # convert to bytes to store in MDS binary format
+                        "tokens": np.asarray(concat_sample).tobytes(),
+                        "num_tokens": len(concat_sample),
+                    }
+

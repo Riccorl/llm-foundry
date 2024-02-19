@@ -15,8 +15,10 @@ module load profile/deeplrn culturax/2309
 module load openmpi/4.1.4--gcc--11.3.0-cuda-11.8 zlib/1.2.13--gcc--11.3.0 cuda/11.8
 
 # export OMP_PROC_BIND=true
-export HF_DATASETS_CACHE=$WORK/hf_cache
+export HF_DATASETS_CACHE=$SCRATCH/hf_cache
 export WANDB_MODE=offline
+# read token from .env file
+export HF_TOKEN=$(cat .env | grep HF_TOKEN | cut -d '=' -f2)
 
 source ~/llmfoundry-cuda-flash-attn2-env/bin/activate
 

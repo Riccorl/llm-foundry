@@ -13,7 +13,7 @@
 module load profile/deeplrn culturax/2309
 
 # export OMP_PROC_BIND=true
-export HF_DATASETS_CACHE=$WORK/hf_cache
+export HF_DATASETS_CACHE=$SCRATCH/hf_cache
 
 source ~/llmfoundry-cuda-flash-attn2-env/bin/activate
 

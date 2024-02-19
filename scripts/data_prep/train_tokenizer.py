@@ -1,4 +1,5 @@
 import argparse
+import psutil
 import sentencepiece as spm
 import transformers as tr
 import time 
@@ -25,7 +26,7 @@ if __name__ == "__main__":
         model_type="bpe",       
         byte_fallback=True,       
         split_digits=True,
-        num_threads=32
+        num_threads=psutil.cpu_count(logical=True),
     )
     end = time.time()
     print("Training took {} seconds".format(end - start))

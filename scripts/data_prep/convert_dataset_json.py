@@ -6,9 +6,11 @@ import os
 from argparse import ArgumentParser, Namespace
 from enum import Enum
 from glob import glob
+import re
 from typing import Dict, Iterable, Optional
 
 import datasets as hf_datasets
+import psutil
 from streaming import MDSWriter
 from torch.utils.data import DataLoader, IterableDataset
 from tqdm import tqdm
@@ -38,12 +40,15 @@ def parse_args() -> Namespace:
         help="Convert text to tokens and concatenate up to this many tokens",
     )
     parser.add_argument("--split", type=str, default="train")
-
+    parser.add_argument("--max_rows", type=int, default=None, required=False)
+    parser.add_argument("--start_row", type=int, default=None)
     parser.add_argument("--tokenizer", type=str, required=False, default=None)
     parser.add_argument("--bos_text", type=str, required=False, default=None)
     parser.add_argument("--eos_text", type=str, required=False, default=None)
     parser.add_argument("--no_wrap", default=False, action="store_true")
     parser.add_argument("--max_tokens", type=int, default=None, required=False)
+    parser.add_argument("--data_files_pattern", type=str, default="*")
+    parser.add_argument("--data_files", type=str, default=None)
 
     parsed = parser.parse_args()
 
@@ -80,6 +85,8 @@ def build_hf_dataset(
     eos_text: str = "",
     no_wrap: bool = False,
     tokenizer: PreTrainedTokenizerBase = None,
+    data_files_pattern: str = "*",
+    data_files: str | None = None,
 ) -> IterableDataset:
     """Build an IterableDataset over the HF C4 or pile source data.
 
@@ -98,15 +105,19 @@ def build_hf_dataset(
     Returns:
         An IterableDataset.
     """
-    if os.path.isdir(path):
-        data_files = glob(f"{path}/*")
-        # order data files by name
-        data_files.sort()
+    if data_files is None:
+        if os.path.isdir(path):
+            match_string = f"{path}/{data_files_pattern}"
+            data_files = [f for f in glob(f"{path}/*") if re.search(match_string, f)]
+            # order data files by name
+            data_files.sort()
+        else:
+            data_files = path
     else:
-        data_files = path
+        data_files = data_files.split(",")
 
     print(f"Loading dataset from {data_files}")
-    hf_dataset = hf_datasets.load_dataset("json", data_files=data_files, split=split, cache_dir=False)
+    hf_dataset = hf_datasets.load_dataset("json", data_files=data_files, split=split, cache_dir=False, num_proc=psutil.cpu_count(logical=True))
 
     if mode == ConcatMode.NO_CONCAT:
         dataset = NoConcatDataset(hf_dataset)
@@ -173,7 +184,7 @@ def main(args: Namespace) -> None:
     """
     if args.concat_tokens is not None:
         mode = ConcatMode.CONCAT_TOKENS
-        tokenizer = AutoTokenizer.from_pretrained(args.tokenizer)
+        tokenizer = AutoTokenizer.from_pretrained(args.tokenizer, use_fast=True)
         # we will enforce length, so suppress warnings about sequences too long for the model
         tokenizer.model_max_length = int(1e30)
         columns = {"tokens": "bytes"}
@@ -182,16 +193,25 @@ def main(args: Namespace) -> None:
         tokenizer = None
         columns = {"text": "str"}
 
+    if args.start_row is None:
+        args.start_row = ""
+    if args.max_rows is None:
+        args.max_rows = ""
+
+    # split = args.split if args.max_rows is None else f"{args.split}[{args.start_row}:{args.max_rows}]"
+    split = f"{args.split}[{args.start_row}:{args.max_rows}]"
     # Get samples
     dataset = build_hf_dataset(
         path=args.path,
-        split=args.split,
+        split=split,
         mode=mode,
         max_length=args.concat_tokens,
         bos_text=args.bos_text,
         eos_text=args.eos_text,
         no_wrap=args.no_wrap,
         tokenizer=tokenizer,
+        data_files_pattern=args.data_files_pattern,
+        data_files=args.data_files,
     )
 
     # Write samples
@@ -208,7 +228,8 @@ def main(args: Namespace) -> None:
             processed_tokens = 0
             progress_bar = tqdm(total=args.max_tokens)
             try:
-                for sample in tqdm(dataset):
+                # for sample in tqdm(dataset):
+                for sample in dataset:
                     processed_tokens += sample["num_tokens"]
                     progress_bar.update(sample.pop("num_tokens"))
                     out.write(sample)
@@ -226,4 +247,5 @@ def main(args: Namespace) -> None:
 
 
 if __name__ == "__main__":
+    os.environ["RAYON_NUM_THREADS"] = "16"
     main(parse_args())
