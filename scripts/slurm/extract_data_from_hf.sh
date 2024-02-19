@@ -14,7 +14,7 @@ module load profile/deeplrn culturax/2309
 # export OMP_PROC_BIND=true
 export HF_DATASETS_CACHE=$WORK/hf_cache
 
-source ~/llmfoundry-cuda-flash-attn2-env/bin/activate
+source ~/__Work/llmfoundry-cuda-flash-attn2-env/bin/activate
 
 
 # ~/llmfoundry-cuda-flash-attn2-env/bin/python scripts/data_prep/extract_hf_to_jsonl.py \
@@ -23,7 +23,7 @@ source ~/llmfoundry-cuda-flash-attn2-env/bin/activate
 #     --max_samples 10_000_000 --streaming --split_size 500_000 
 
 
-~/llmfoundry-cuda-flash-attn2-env/bin/python /leonardo/home/userexternal/rorland1/llm-foundry/scripts/data_prep/extract_hf_to_jsonl.py \
-    --dataset_path /leonardo/prod/data/ai/culturax/2309/it \
-    --path_to_save /leonardo_work/IscrB_medit/culturax/extracted/350M-model/it/ \
-    --max_samples 10_000_000 --streaming --split_size 500_000
+~/__Work/llmfoundry-cuda-flash-attn2-env/bin/python /leonardo/home/userexternal/lmoroni0/__Work/llm-foundry/scripts/data_prep/extract_hf_to_jsonl.py \
+    --dataset_path /leonardo/prod/data/ai/culturax/2309/en \
+    --path_to_save /leonardo_work/IscrB_medit/culturax/extracted/100M-model-reservoir/en/ \
+    --max_samples 3_000_000 --streaming --split_size 500_000

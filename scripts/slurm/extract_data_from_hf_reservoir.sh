@@ -1,28 +1,32 @@
 #!/bin/bash
-#SBATCH --job-name=extract_data_from_hf_reservoir    # Job name
-#SBATCH -o logs/minestral-350m-en-it-07012024/extract_data_from_hf-job.out              # Name of stdout output file
-#SBATCH -e logs/minestral-350m-en-it-07012024/extract_data_from_hf-job.err              # Name of stderr error file
+#SBATCH --job-name=extract_data_from_hf_reservoir_it    # Job name
+#SBATCH -o extract_data_from_hf_it-job.out              # Name of stdout output file
+#SBATCH -e extract_data_from_hf_it-job.err              # Name of stderr error file
 #SBATCH --nodes=1               # number of nodes
 #SBATCH --ntasks-per-node=1     # number of tasks per node
 #SBATCH --cpus-per-task=4       # number of threads per task
-#SBATCH --time 00:50:00          # format: HH:MM:SS
+#SBATCH --time 4:00:00          # format: HH:MM:SS
+#SBATCH --mem 30GB
 
 #SBATCH -A IscrB_medit
 
 module load profile/deeplrn culturax/2309
 
 # export OMP_PROC_BIND=true
-export HF_DATASETS_CACHE=$WORK/hf_cache
+export HF_DATASETS_CACHE=$WORK/hf_cache_lm
 
-source ~/llmfoundry-cuda-flash-attn2-env/bin/activate
+source ~/__Work/llmfoundry-cuda-flash-attn2-env/bin/activate
 
+# --sources mC4 OSCAR-2301 OSCAR-2201
 
-~/llmfoundry-cuda-flash-attn2-env/bin/python /leonardo/home/userexternal/rorland1/llm-foundry/scripts/data_prep/extract_hf_to_jsonl_reservoir.py \
+~/__Work/llmfoundry-cuda-flash-attn2-env/bin/python /leonardo/home/userexternal/lmoroni0/__Work/llm-foundry/scripts/data_prep/extract_hf_to_jsonl_reservoir.py \
     --dataset_path /leonardo/prod/data/ai/culturax/2309/en \
-    --path_to_save /leonardo_work/IscrB_medit/culturax/extracted/350M-model_reservoir/en/ \
-    --max_samples 10_000_000 --split_size 500_000 --ds_split train --sources mC4 OSCAR-2301 OSCAR-2201
+    --path_to_save /leonardo_work/IscrB_medit/culturax_res/reservoir_sample_10M_100M/en/ \
+    --max_samples 10_000_000 --split_size 500_000 --max_iterations 100_000_000 --ds_split train \
+    --sources mC4 OSCAR-2301 OSCAR-2201
 
-# ~/llmfoundry-cuda-flash-attn2-env/bin/python /leonardo/home/userexternal/rorland1/llm-foundry/scripts/data_prep/extract_hf_to_jsonl_reservoir.py \
-#     --dataset_path /leonardo/prod/data/ai/culturax/2309/it \
-#     --path_to_save /leonardo_work/IscrB_medit/culturax/extracted/350M-model_reservoir/it/ \
-#     --max_samples 10_000_000 --split_size 500_000 --ds_split train --sources mC4 OSCAR-2301 OSCAR-2201
+# ~/__Work/llmfoundry-cuda-flash-attn2-env/bin/python /leonardo/home/userexternal/lmoroni0/__Work/llm-foundry/scripts/data_prep/extract_hf_to_jsonl_reservoir.py \
+#     --dataset_path /leonardo/prod/data/ai/hplt_dataset/1.2/ \
+#     --path_to_save /leonardo_work/IscrB_medit/hplt_res/reservoir_sample_10M_100M/it/ \
+#     --max_samples 10_000_000 --split_size 500_000 --max_iterations 100_000_000 --ds_split train \
+#     --sources mC4 OSCAR-2301 OSCAR-2201

@@ -1,0 +1,28 @@
+#!/bin/bash
+#SBATCH --job-name=extract_data_from_hf_reservoir_it    # Job name
+#SBATCH -o extract_data_from_hf_it-job.out              # Name of stdout output file
+#SBATCH -e extract_data_from_hf_it-job.err              # Name of stderr error file
+#SBATCH --nodes=1               # number of nodes
+#SBATCH --ntasks-per-node=1     # number of tasks per node
+#SBATCH --cpus-per-task=4       # number of threads per task
+#SBATCH --time 4:00:00          # format: HH:MM:SS
+#SBATCH --mem 30GB
+
+#SBATCH -A IscrB_medit
+
+module load profile/deeplrn hplt-datasets/1.2
+
+# export OMP_PROC_BIND=true
+export HF_DATASETS_CACHE=$WORK/hf_cache_lm
+
+source ~/__Work/llmfoundry-cuda-flash-attn2-env/bin/activate
+
+~/__Work/llmfoundry-cuda-flash-attn2-env/bin/python /leonardo/home/userexternal/lmoroni0/__Work/llm-foundry/scripts/data_prep/extract_hf_to_jsonl_hq.py \
+    --dataset_path /leonardo/prod/data/ai/hplt-datasets/1.2/en \
+    --path_to_save /leonardo_work/IscrB_medit/hplt_res/reservoir_hq_53M/en/ \
+    --split_size 500_000 --max_iterations 55_000_000 --ds_split train \
+
+#~/__Work/llmfoundry-cuda-flash-attn2-env/bin/python /leonardo/home/userexternal/lmoroni0/__Work/llm-foundry/scripts/data_prep/extract_hf_to_jsonl_hq.py \
+#    --dataset_path /leonardo/prod/data/ai/hplt-datasets/1.2/it \
+#    --path_to_save /leonardo_work/IscrB_medit/hplt_res/reservoir_hq_53M/it/ \
+#    --split_size 500_000 --max_iterations 55_000_000 --ds_split train \

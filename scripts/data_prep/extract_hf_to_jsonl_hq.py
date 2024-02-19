@@ -15,40 +15,34 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 HF_CACHE = os.getenv("HF_DATASETS_CACHE", os.path.expanduser("~/.cache/huggingface"))
-URLS_FILE_NAME = "urls.json"
-
 
 HIGH_QUALITY_SOURCES = ["wikipedia.org", "reddit.com", "eur-lex.europa.eu", "gutenberg.org", "wikinews.org"]
 
-def save_to_jsonl(dataset, path_to_save, split_size, max_samples, reservoir_indexes, sources, max_iterations):
+
+def save_file(dataset_path, hq_subset, shard_idx_hq):
+    split_path_hq = dataset_path / f"hq"
+    split_path_hq.mkdir(parents=True, exist_ok=True)
+
+    print(f"Writing to {split_path_hq / f'{shard_idx_hq}.jsonl'}")
+    print(f"Writing {len(hq_subset)} lines in hq based ")
+    with open(split_path_hq / f"{shard_idx_hq}.jsonl", "w") as f:
+        f.writelines(json.dumps(r) + "\n" for r in hq_subset)
+
+
+def save_to_jsonl(dataset, path_to_save, split_size, sources, max_iterations):
     # now we can save the dataset in jsonl format, divided in multiple files
     # we would like to parallelize this step, we can use the multiprocessing library
     dataset_path = Path(path_to_save)
     dataset_path.mkdir(parents=True, exist_ok=True)
 
     # create a new file for each split, parallelize this step
-    web_subset = []
-    shard_idx_web = 0
-
-    # with open(url_file_path, "w") as url_file:
-
-    reservoir_i = 0
+    hq_subset = []
+    shard_idx_hq = 0
 
     for i, sample in tqdm(enumerate(dataset)):
 
         if i == max_iterations: # stop after max_iterations reached
             break
-
-        if reservoir_i == len(reservoir_indexes):
-            break
-       
-        if i != reservoir_indexes[reservoir_i]:
-            continue
-
-        # if this index is the same as the first reservoir_idex i will remove
-        # the first index, searching for the second
-        # reservoir_indexes.pop(0) # remove in place (I hope :))
-        reservoir_i += 1
 
         # sample only certain resources
         if sources is not None and sample["source"] not in sources:
@@ -56,41 +50,23 @@ def save_to_jsonl(dataset, path_to_save, split_size, max_samples, reservoir_inde
        
         base_url = urlparse(sample["url"]).netloc
 
-        # url_file.write(json.dumps({"index": i, "url": sample["url"]}) + "\n")
-        if not any([q in base_url for q in HIGH_QUALITY_SOURCES]):
-            web_subset.append(sample)
+        if any([q in base_url for q in HIGH_QUALITY_SOURCES]):
+            hq_subset.append(sample)
         else:
             continue
         
-        if len(web_subset) >= split_size:
-            split_path_web = dataset_path / f"web"
-            split_path_web.mkdir(parents=True, exist_ok=True)
+        if len(hq_subset) >= split_size:
+            save_file(dataset_path, hq_subset, shard_idx_hq)
 
-            print(f"Writing to {split_path_web / f'{shard_idx_web}.jsonl'}")
-            print(f"Writing {len(web_subset)} lines in web based ")
-            with open(split_path_web / f"{shard_idx_web}.jsonl", "w") as f:
-                f.writelines(json.dumps(r) + "\n" for r in web_subset)
+            hq_subset = []
 
-            web_subset = []
+            shard_idx_hq += 1
 
-            shard_idx_web += 1
-
-    if len(web_subset) > 0:
-        split_path_web = dataset_path / f"web"
-        split_path_web.mkdir(parents=True, exist_ok=True)
-
-        print(f"Writing to {split_path_web / f'{shard_idx_web}.jsonl'}")
-        print(f"Writing {len(web_subset)} lines in web based ")
-        with open(split_path_web / f"{shard_idx_web}.jsonl", "w") as f:
-            f.writelines(json.dumps(r) + "\n" for r in web_subset)
+    if len(hq_subset) > 0:
+        save_file(dataset_path, hq_subset, shard_idx_hq)
 
 
 def main(args):
-    #token = huggingface_hub.HfFolder.get_token()
-    #if token is None:
-    #    logger.info("HuggingFace Login")
-    #    login()
-
     logger.info("==== Starting download Dataset ====")
    
     if args.max_iterations == -1:
@@ -113,21 +89,7 @@ def main(args):
         streaming=True
     )
 
-    url_file_path = Path(args.url_file_path) / URLS_FILE_NAME
-
-    print("generating indexes...")
-    
-    reservoir_indexes = random.sample(range(max_iterations), args.max_samples)
-    
-    print("indexes generated!!!")
-
-    print("sort indexes for optimized checking...")
-
-    reservoir_indexes.sort()
-
-    print("sorted!!!")
-
-    save_to_jsonl(dataset, args.path_to_save, args.split_size, args.max_samples, reservoir_indexes, args.sources, max_iterations)
+    save_to_jsonl(dataset, args.path_to_save, args.split_size, args.sources, max_iterations)
 
 
 if __name__ == "__main__":
@@ -142,11 +104,6 @@ if __name__ == "__main__":
         type=str,
         default="./",
         help="Path to save the dataset.",
-    )
-    parser.add_argument(
-        "--max_samples",
-        type=int,
-        help="Max number of row to download",
     )
     parser.add_argument(
         "--split_size",
@@ -166,12 +123,6 @@ if __name__ == "__main__":
         type=str,
         default="train",
         help="dataset split to retrieve"
-    )
-    parser.add_argument(
-        "--url_file_path",
-        type=str,
-        default="",
-        help="path to save the url file"
     )
     parser.add_argument(
         "--max_iterations",

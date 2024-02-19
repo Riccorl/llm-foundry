@@ -13,7 +13,7 @@ from tqdm import tqdm
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-HF_CACHE = os.getenv("HF_HOME", os.path.expanduser("~/.cache/huggingface"))
+HF_CACHE = os.getenv("HF_DATASETS_CACHE", os.path.expanduser("~/.cache/huggingface"))
 print(HF_CACHE)
 
 def save_to_jsonl_streaming(dataset, path_to_save, split_size, max_samples=None, sources=None):
@@ -124,10 +124,10 @@ def download_streaming_dataset(dataset, path_to_save, split_size, row_to_downloa
 
 
 def main(args):
-    token = huggingface_hub.HfFolder.get_token()
-    if token is None:
-        logger.info("HuggingFace Login")
-        login()
+#   token = huggingface_hub.HfFolder.get_token()
+#   if token is None:
+#       logger.info("HuggingFace Login")
+#       login()
 
     if args.streaming:
         logger.info("==== Starting download CulturaX in streaming mode ====")
@@ -136,8 +136,12 @@ def main(args):
             # split="train",  # TODO change this
             streaming=True,
             cache_dir=HF_CACHE,
-            token=True,
+#             token=True,
         )
+
+        print("shuffle...")
+        dataset["train"] = dataset["train"].shuffle(seed=42, buffer_size=200_000_000)
+        print("done")
         sources = ["mC4", "OSCAR-2301", "OSCAR-2201"]
         save_to_jsonl_streaming(dataset, args.path_to_save, args.split_size, args.max_samples, sources)
         # download_streaming_dataset(dataset, args)
