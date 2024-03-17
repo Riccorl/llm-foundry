@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """Streaming dataset conversion scripts for C4 and The Pile."""
+from glob import glob
 import json
 import os
 import platform
@@ -32,6 +33,7 @@ def parse_args() -> Namespace:
         description="Convert dataset into MDS format, optionally concatenating and tokenizing"
     )
     parser.add_argument("--dataset", type=str, required=True)
+
     parser.add_argument(
         "--data_subset", type=str, default=None, help='E.g. "all" or "en"'
     )
@@ -56,6 +58,9 @@ def parse_args() -> Namespace:
     parser.add_argument("--eos_text", type=str, required=False, default=None)
     parser.add_argument("--no_wrap", default=False, action="store_true")
     parser.add_argument("--num_workers", type=int, required=False, default=None)
+    parser.add_argument("--max_tokens", type=int, default=None, required=False)
+    parser.add_argument("--shuffle", default=False, action="store_true")
+    parser.add_argument("--is_local", default=False, action="store_true")
 
     parsed = parser.parse_args()
 
@@ -64,13 +69,13 @@ def parse_args() -> Namespace:
     else:
         parsed.tokenizer_kwargs = {}
 
-    if (
-        os.path.isdir(parsed.out_root)
-        and len(set(os.listdir(parsed.out_root)).intersection(set(parsed.splits))) > 0
-    ):
-        raise ValueError(
-            f"--out_root={parsed.out_root} contains {os.listdir(parsed.out_root)} which cannot overlap with the requested splits {parsed.splits}."
-        )
+    # if (
+    #     os.path.isdir(parsed.out_root)
+    #     and len(set(os.listdir(parsed.out_root)).intersection(set(parsed.splits))) > 0
+    # ):
+    #     raise ValueError(
+    #         f"--out_root={parsed.out_root} contains {os.listdir(parsed.out_root)} which cannot overlap with the requested splits {parsed.splits}."
+    #     )
 
     # Make sure we have needed concat options
     if (
@@ -216,7 +221,38 @@ c4constants.splits["val_xxsmall"] = DataSplitConstants(
     truncated_samples=100,
 )
 
-CONSTS = {"c4": c4constants, "the_pile": pileconstants}
+cxconstants = DatasetConstants(
+    chars_per_sample=2163,  # Computed over validation set
+    chars_per_token=4,  # OpenAI estimate
+)
+cxconstants.splits["train"] = DataSplitConstants(
+    hf_split="train",
+    folder_split="train",
+    raw_samples=None,
+    truncated_samples=None,
+)
+# cxconstants.splits["val"] = DataSplitConstants(
+#     hf_split="validation",
+#     folder_split="val",
+#     raw_samples=364608,
+#     truncated_samples=None,
+# )
+
+anyconstants = DatasetConstants(
+    chars_per_sample=2163,  # useless
+    chars_per_token=4,  # useless
+)
+anyconstants.splits["train"] = DataSplitConstants(
+    hf_split="train",
+    folder_split="train",
+    raw_samples=None,
+    truncated_samples=None,
+)
+
+CONSTS = {
+    "c4": c4constants,
+    "the_pile": pileconstants,
+}
 
 
 def build_hf_dataset(
@@ -229,6 +265,11 @@ def build_hf_dataset(
     no_wrap: bool = False,
     tokenizer: PreTrainedTokenizerBase = None,
     data_subset: Union[str, None] = None,
+    streaming: bool = True,
+    shuffle: bool = False,
+    seed: int = 42,
+    is_local: bool = False,
+    num_workers: Optional[int] = None,
 ) -> IterableDataset:
     """Build an IterableDataset over the HF C4 or pile source data.
 
@@ -247,9 +288,26 @@ def build_hf_dataset(
     Returns:
         An IterableDataset.
     """
-    hf_dataset = hf_datasets.load_dataset(
-        path=dataset_name, name=data_subset, split=split, streaming=True
-    )
+    if is_local:
+        if os.path.isdir(dataset_name):
+            # only jsonl for now
+            data_files = glob(f'{dataset_name}/*.jsonl')
+        else:
+            data_files = dataset_name
+        hf_dataset = hf_datasets.load_dataset(
+            "json",
+            data_files=data_files,
+            split=split,
+            streaming=streaming,
+            num_proc=num_workers if not streaming else None,
+        )
+    else:
+        hf_dataset = hf_datasets.load_dataset(
+            path=dataset_name, name=data_subset, split=split, streaming=streaming
+        )
+    if shuffle:
+        print("Shuffling dataset")
+        hf_dataset = hf_dataset.shuffle(seed=seed)
     if mode == ConcatMode.NO_CONCAT:
         dataset = NoConcatDataset(hf_dataset)
     else:
@@ -353,7 +411,7 @@ def main(args: Namespace) -> None:
         args (Namespace): Commandline arguments.
     """
     try:
-        dataset_constants = CONSTS[args.dataset]
+        dataset_constants = CONSTS.get(args.dataset, anyconstants)
     except KeyError:
         raise ValueError(
             f'Constants for dataset "{args.dataset}" not found. Currently only "the_pile" and "c4" are supported.'
@@ -394,9 +452,12 @@ def main(args: Namespace) -> None:
             eos_text=args.eos_text,
             no_wrap=args.no_wrap,
             tokenizer=tokenizer,
+            shuffle=args.shuffle,
+            is_local=args.is_local,
+            num_workers=args.num_workers,
         )
         loader = build_dataloader(
-            dataset=dataset, batch_size=512, num_workers=args.num_workers
+            dataset=dataset, batch_size=1024, num_workers=args.num_workers
         )
         samples = generate_samples(loader, truncate_num_samples=truncate_num_samples)
 
@@ -416,7 +477,7 @@ def main(args: Namespace) -> None:
             denominator = None
 
         # Write samples
-        print(f"Converting {folder_split} to MDS format...")
+        print(f"Converting {args.dataset} to MDS format...")
         print(
             f"Note: the progress bar is based on the dataset length before tokenization, and may finish at a value before 100%."
         )
@@ -428,9 +489,30 @@ def main(args: Namespace) -> None:
             if denominator is not None:
                 for sample in tqdm(samples, desc=folder_split, total=denominator):
                     out.write(sample)
-            else:
-                for sample in tqdm(samples, desc=folder_split):
+            
+            # we also want to count the number of tokens for the progress bar
+            processed_tokens = 0
+            progress_bar = tqdm(total=args.max_tokens)
+            try:
+                for sample in samples:
+                    processed_tokens += sample["num_tokens"]
+                    progress_bar.update(sample.pop("num_tokens").item())
                     out.write(sample)
+                    if args.max_tokens is not None and processed_tokens >= args.max_tokens:
+                        print("Stopping early due to --max_tokens")
+                        break
+            except Exception as e:
+                print(f"Exception: {e}")
+                print(f"Processed {processed_tokens} tokens")
+            
+            # elif args.max_tokens is not None:
+                
+            # else:
+            #     for sample in tqdm(samples, desc=folder_split):
+            #         out.write(sample)
+
+        print(f"Finished converting {args.dataset} to MDS format.")
+        print("Finished converting all splits to MDS format.")
 
 
 if __name__ == "__main__":

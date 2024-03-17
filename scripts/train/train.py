@@ -244,9 +244,12 @@ def main(cfg: DictConfig) -> Trainer:
     )
     train_loader_config: DictConfig = pop_config(cfg, "train_loader", must_exist=True)
 
-    # Optional fsdp data, fine-tuning, and eval configs
+    # Optional fsdp data, deepspeed config, fine-tuning, and eval configs
     fsdp_config: Optional[Dict[str, Any]] = pop_config(
         cfg, "fsdp_config", must_exist=False, default_value=None, convert=True
+    )
+    deepspeed_config: Optional[Dict[str, Any]] = pop_config(
+        cfg, "deepspeed_config", must_exist=False, default_value=None, convert=True
     )
     lora_config: Optional[Dict[str, Any]] = pop_config(
         cfg, "lora", must_exist=False, default_value=None, convert=True
@@ -587,6 +590,7 @@ def main(cfg: DictConfig) -> Trainer:
         algorithms=algorithms,
         device_train_microbatch_size=device_train_microbatch_size,
         fsdp_config=fsdp_config,
+        deepspeed_config=deepspeed_config,
         save_folder=save_folder,
         save_filename=save_filename,
         save_latest_filename=save_latest_filename,

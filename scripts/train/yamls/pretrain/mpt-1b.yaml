@@ -82,6 +82,7 @@ device_eval_batch_size: 4
 device_train_microbatch_size: 4
 # device_train_microbatch_size: auto
 precision: amp_bf16
+grad_accum: auto
 
 # FSDP
 fsdp_config:

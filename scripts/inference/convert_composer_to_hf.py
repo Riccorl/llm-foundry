@@ -161,6 +161,7 @@ def parse_args() -> Namespace:
         "--output_precision", type=str, choices=["fp32", "fp16", "bf16"], default="fp32"
     )
     parser.add_argument("--hf_repo_for_upload", type=str, default=None)
+    parser.add_argument("--revision", type=str, default=None)
     parser.add_argument("--test_uploaded_model", action="store_true")
     parser.add_argument(
         "--trust_remote_code",
@@ -257,12 +258,16 @@ def _convert_composer_to_hf(args: Namespace) -> None:
         ):
             ignore_patterns.append("pytorch_model.bin")
 
+        if args.revision is not None:
+            api.create_branch(args.hf_repo_for_upload, repo_type="model", branch=args.revision)
+        
         api.upload_folder(
             folder_path=args.hf_output_path,
             repo_id=args.hf_repo_for_upload,
             use_auth_token=True,
             repo_type="model",
             ignore_patterns=ignore_patterns,
+            revision=args.revision,
         )
         print("Folder uploaded.")
 
@@ -273,6 +278,7 @@ def _convert_composer_to_hf(args: Namespace) -> None:
                 trust_remote_code=True,
                 use_auth_token=True,
                 torch_dtype=dtype,
+                revision=args.revision,
             )
             hub_tokenizer = transformers.AutoTokenizer.from_pretrained(
                 args.hf_repo_for_upload, trust_remote_code=True, use_auth_token=True

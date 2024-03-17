@@ -116,6 +116,7 @@ class ComposerHFCausalLM(HuggingFaceModelWithZLoss):
             # whether it is installed above, and whether the chosen config supports it here.
             # https://github.com/huggingface/transformers/issues/26878
             config._flash_attn_2_enabled = use_flash_attention_2
+            config.attn_implementation= "flash_attention_2" if use_flash_attention_2 else None
 
             # set config overrides
             for k, v in om_model_config.get('config_overrides', {}).items():
@@ -172,7 +173,6 @@ class ComposerHFCausalLM(HuggingFaceModelWithZLoss):
                             trust_remote_code=trust_remote_code,
                             use_auth_token=use_auth_token,
                             config=config,
-                            attn_implementation="flash_attention_2" if use_flash_attention_2 else None,
                         )
 
             dist.barrier()

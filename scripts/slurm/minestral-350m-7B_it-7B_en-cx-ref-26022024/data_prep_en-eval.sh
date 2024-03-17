@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=minestral-350m-7B_it-7B_en-cx-13022024    # Job name
-#SBATCH -o logs/minestral-350m-7B_it-7B_en-cx-13022024/data_prep-en-7B-dcgp-job.out              # Name of stdout output file
-#SBATCH -e logs/minestral-350m-7B_it-7B_en-cx-13022024/data_prep-en-7B-dcgp-job.err              # Name of stderr error file
+#SBATCH --job-name=minestral-350m-7B_it-7B_en-cx-eval-13022024    # Job name
+#SBATCH -o logs/minestral-350m-7B_it-7B_en-cx-13022024/data_prep-en-eval-job.out              # Name of stdout output file
+#SBATCH -e logs/minestral-350m-7B_it-7B_en-cx-13022024/data_prep-en-eval-job.err              # Name of stderr error file
 #SBATCH --nodes=1               # number of nodes
 #SBATCH --ntasks-per-node=1     # number of tasks per node
-#SBATCH --cpus-per-task=96       # number of threads per task
-#SBATCH --time 1:00:00          # format: HH:MM:SS
+#SBATCH --cpus-per-task=32       # number of threads per task
+#SBATCH --time 8:00:00          # format: HH:MM:SS
 #SBATCH --mem 128G              # memory per node
 
 #SBATCH -A IscrB_medit
@@ -24,6 +24,7 @@ source ~/llmfoundry-cuda-flash-attn2-env/bin/activate
 
 ~/llmfoundry-cuda-flash-attn2-env/bin/python scripts/data_prep/convert_dataset_json.py \
     --path /leonardo_work/IscrB_medit/culturax_res/reservoir_sample_10M_100M/en/web \
-    --out_root /leonardo_scratch/large/userexternal/rorland1/data/minestral-350m-7B_it-7B_en-cx-13022024/data/debug \
+    --data_files_pattern "15.jsonl" \
+    --out_root /leonardo_scratch/large/userexternal/rorland1/data/minestral-350m-7B_it-7B_en-cx-13022024/data/processed/en/eval \
     --split train --concat_tokens 2048 --tokenizer /leonardo_scratch/large/userexternal/rorland1/data/minestral-350m-7B_it-7B_en-cx-13022024/tokenizer/minestral-350m-7B_it-7B_en-cx-13022024-hf \
-    --max_tokens 7_000_000_000
+    --max_tokens 70_000
