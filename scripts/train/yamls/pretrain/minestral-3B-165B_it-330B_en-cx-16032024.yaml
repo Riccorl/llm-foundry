@@ -169,5 +169,5 @@ save_folder: /leonardo_scratch/large/userexternal/rorland1/llm-foundry/runs/{run
 # save_folder: s3://my-bucket/my-folder/{run_name}/checkpoints
 
 # Load from local filesystem or remote object store
-# load_path: /leonardo_scratch/large/userexternal/rorland1/llm-foundry/runs/{run_name}/latest-rank{rank}.pt
+load_path: /leonardo_scratch/large/userexternal/rorland1/llm-foundry/runs/{run_name}/latest-rank{rank}.pt
 # load_path: s3://my-bucket/my-folder/gpt-125m/checkpoints/latest-rank{rank}.pt

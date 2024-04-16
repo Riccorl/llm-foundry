@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=minestral-3B-165B_it-330B_en-cx-16032024-data-it  # Job name
-#SBATCH -o logs/minestral-3B-165B_it-330B_en-cx-16032024/data_prep-2048-it.out              # Name of stdout output file
-#SBATCH -e logs/minestral-3B-165B_it-330B_en-cx-16032024/data_prep-2048-it.err              # Name of stderr error file
+#SBATCH --job-name=minestral-3B-165B_it-330B_en-cx-16032024-data-it-fast # Job name
+#SBATCH -o logs/minestral-3B-165B_it-330B_en-cx-16032024/data_prep-fast-it.out              # Name of stdout output file
+#SBATCH -e logs/minestral-3B-165B_it-330B_en-cx-16032024/data_prep-fast-it.err              # Name of stderr error file
 #SBATCH --nodes=1               # number of nodes
 #SBATCH --ntasks-per-node=1     # number of tasks per node
 #SBATCH --cpus-per-task=32      # number of threads per task
@@ -20,7 +20,7 @@ source ~/llmfoundry-cuda-flash-attn2-env/bin/activate
 
 ~/llmfoundry-cuda-flash-attn2-env/bin/python scripts/data_prep/convert_dataset_hf.py \
     --dataset /leonardo/prod/data/ai/culturax/2309/it \
-    --out_root /leonardo_work/IscrB_medit/training/minestral-3B-165B_it-330B_en-cx-16032024-2048/data/processed/it \
+    --out_root /leonardo_scratch/fast/IscrB_medit/training/minestral-3B-165B_it-330B_en-cx-16032024-2048/data/processed/it \
     --split train --concat_tokens 2048 --tokenizer /leonardo_scratch/large/userexternal/rorland1/data/minestral-350m-7B_it-7B_en-cx-13022024/tokenizer/minestral-350m-7B_it-7B_en-cx-13022024-hf \
     --num_workers 32 \
     --shuffle

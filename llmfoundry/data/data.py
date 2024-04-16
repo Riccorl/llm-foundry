@@ -63,15 +63,17 @@ class ConcatTokensDataset(IterableDataset):
         eos_text: str,
         no_wrap: bool,
         write_batch_size: int = 10_000,
+        multi_process: bool = False,
     ):
         self.hf_dataset = hf_dataset
         self.tokenizer = tokenizer
-        os.environ["TOKENIZERS_PARALLELISM"] = "false"
+        os.environ["TOKENIZERS_PARALLELISM"] = "false" if not multi_process else "true"
         self.max_length = max_length
         self.bos_text = bos_text
         self.eos_text = eos_text
         self.should_wrap = not no_wrap
         self.write_batch_size = write_batch_size
+        self.multi_process = multi_process
 
         self.bos_tokens = self.tokenizer(
             self.bos_text, truncation=False, padding=False, add_special_tokens=False
@@ -106,16 +108,19 @@ class ConcatTokensDataset(IterableDataset):
             )
 
     def __iter__(self) -> Iterable[Dict[str, bytes]]:
-
+        if self.multi_process:
+            return self.multi_threaded_iter()
+        else:
+            return self.single_threaded_iter()
+        
+    
+    def single_threaded_iter(self) -> Iterable[Dict[str, bytes]]:
         total_samples = 0
-
-        # sources = ["mC4", "OSCAR-2301", "OSCAR-2201"]
-        # sources = ["OSCAR-2019", "OSCAR-2109"]
-
         buffer = []
         for sample in self.hf_dataset:
             # if sample["source"] in sources:
             #     continue
+            total_samples += 1
             encoded = self.tokenizer(sample["text"], truncation=False, padding=False)
             iids = encoded["input_ids"]
             buffer = buffer + self.bos_tokens + iids + self.eos_tokens
@@ -127,29 +132,42 @@ class ConcatTokensDataset(IterableDataset):
                     "tokens": np.asarray(concat_sample).tobytes(),
                     "num_tokens": len(concat_sample),
                 }
+        print(f"Total samples processed: {total_samples}")
 
-        # buffer = []
-        # if hasattr(self.hf_dataset, "num_rows"):
-        #     shards = self.hf_dataset.num_rows // self.write_batch_size + 1
-        #     for i in range(shards):
-        #         shard = self.hf_dataset[
-        #             i * self.write_batch_size : (i + 1) * self.write_batch_size
-        #         ]
-        #         encoded_shard = self.tokenizer(
-        #             shard["text"], truncation=False, padding=False
-        #         )
-        #         total_samples += len(encoded_shard["input_ids"])
-        #         for encoded in encoded_shard["input_ids"]:
-        #             iids = encoded  # ['input_ids']
-        #             buffer = buffer + self.bos_tokens + iids + self.eos_tokens
-        #             while len(buffer) >= self.max_length:
-        #                 concat_sample = buffer[: self.max_length]
-        #                 buffer = buffer[self.max_length :] if self.should_wrap else []
-        #                 yield {
-        #                     # convert to bytes to store in MDS binary format
-        #                     "tokens": np.asarray(concat_sample).tobytes(),
-        #                     "num_tokens": len(concat_sample),
-        #                 }
+    def multi_threaded_iter(self) -> Iterable[Dict[str, bytes]]:
+        total_samples = 0
+
+        print("Starting multi-threaded tokenization")
+
+        buffer = []
+        # split samples into smaller chunks to avoid memory issues
+        # self.hf_dataset.map(
+        #     self._tokenize_and_yield,
+        #     batched=True,
+        #     batch_size=self.write_batch_size,
+        #     writer_batch_size=self.write_batch_size,
+        # )
+        shards = self.hf_dataset.num_rows // self.write_batch_size + 1
+        print("Shards: ", shards)
+        for i in range(shards):
+            shard = self.hf_dataset[
+                i * self.write_batch_size : (i + 1) * self.write_batch_size
+            ]
+            encoded_shard = self.tokenizer(
+                shard["text"], truncation=False, padding=False
+            )
+            total_samples += len(encoded_shard["input_ids"])
+            for encoded in encoded_shard["input_ids"]:
+                iids = encoded  # ['input_ids']
+                buffer = buffer + self.bos_tokens + iids + self.eos_tokens
+                while len(buffer) >= self.max_length:
+                    concat_sample = buffer[: self.max_length]
+                    buffer = buffer[self.max_length :] if self.should_wrap else []
+                    yield {
+                        # convert to bytes to store in MDS binary format
+                        "tokens": np.asarray(concat_sample).tobytes(),
+                        "num_tokens": len(concat_sample),
+                    }
         # else:
         #     sample_batch = []
         #     for sample in self.hf_dataset:

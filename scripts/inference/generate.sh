@@ -1,6 +1,10 @@
 #!/bin/bash
 
-export HF_DATASETS_CACHE=$WORK/hf_cache
+export HF_DATASETS_CACHE=$SCRATCH/hf_cache
+export HUGGINGFACE_HUB_CACHE=$SCRATCH/hf_cache
+export WANDB_MODE=offline
+# read Huggingface token from .env file
+export HF_TOKEN=$(cat .envs | grep HF_TOKEN | cut -d '=' -f2)
 
 source ~/llmfoundry-cuda-flash-attn2-env/bin/activate
 

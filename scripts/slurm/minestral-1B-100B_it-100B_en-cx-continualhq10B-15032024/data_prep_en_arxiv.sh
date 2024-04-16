@@ -1,11 +1,12 @@
 #!/bin/bash
-#SBATCH --job-name=minestral-3B-165B_it-330B_en-cx-16032024-data-en-fast  # Job name
-#SBATCH -o logs/minestral-3B-165B_it-330B_en-cx-16032024/data_prep-fast-en.out              # Name of stdout output file
-#SBATCH -e logs/minestral-3B-165B_it-330B_en-cx-16032024/data_prep-fast-en.err              # Name of stderr error file
+#SBATCH --job-name=minestral-1B-100B_it-100B_en-cx-continualhq10B-14042024-data-arxiv  # Job name
+#SBATCH -o logs/minestral-1B-100B_it-100B_en-cx-continualhq10B-14042024/data_prep-arxiv-1.out              # Name of stdout output file
+#SBATCH -e logs/minestral-1B-100B_it-100B_en-cx-continualhq10B-14042024/data_prep-arxiv-1.err              # Name of stderr error file
 #SBATCH --nodes=1               # number of nodes
 #SBATCH --ntasks-per-node=1     # number of tasks per node
 #SBATCH --cpus-per-task=32      # number of threads per task
-#SBATCH --time 12:00:00          # format: HH:MM:SS
+#SBATCH --time 24:00:00          # format: HH:MM:SS
+#SBATCH --mem=450GB                 # total memory limit
 
 #SBATCH -A IscrB_medit
 #SBATCH -p boost_usr_prod
@@ -19,9 +20,10 @@ export HF_DATASETS_CACHE=$SCRATCH/hf_cache
 source ~/llmfoundry-cuda-flash-attn2-env/bin/activate
 
 ~/llmfoundry-cuda-flash-attn2-env/bin/python scripts/data_prep/convert_dataset_hf.py \
-    --dataset /leonardo/prod/data/ai/culturax/2309/en \
-    --out_root /leonardo_scratch/fast/IscrB_medit/training/minestral-3B-165B_it-330B_en-cx-16032024-2048/data/processed/en \
+    --dataset /leonardo_scratch/large/userexternal/phuguetc/arxiv/ \
+    --out_root /leonardo_scratch/fast/IscrB_medit/training/minestral-1B-100B_it-100B_en-cx-continualhq10B-15032024/data/processed/arxiv \
     --split train --concat_tokens 2048 --tokenizer /leonardo_scratch/large/userexternal/rorland1/data/minestral-350m-7B_it-7B_en-cx-13022024/tokenizer/minestral-350m-7B_it-7B_en-cx-13022024-hf \
-    --max_tokens 330_000_000_000 \
     --num_workers 32 \
-    --shuffle
+    --dataloader_batch_size 1024 \
+    --shuffle \
+    --is_local

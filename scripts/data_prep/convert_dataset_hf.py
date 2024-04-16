@@ -59,6 +59,7 @@ def parse_args() -> Namespace:
     parser.add_argument("--no_wrap", default=False, action="store_true")
     parser.add_argument("--num_workers", type=int, required=False, default=None)
     parser.add_argument("--max_tokens", type=int, default=None, required=False)
+    parser.add_argument("--dataloader_batch_size", type=int, default=512, required=False)
     parser.add_argument("--shuffle", default=False, action="store_true")
     parser.add_argument("--is_local", default=False, action="store_true")
 
@@ -457,7 +458,7 @@ def main(args: Namespace) -> None:
             num_workers=args.num_workers,
         )
         loader = build_dataloader(
-            dataset=dataset, batch_size=1024, num_workers=args.num_workers
+            dataset=dataset, batch_size=args.dataloader_batch_size, num_workers=args.num_workers
         )
         samples = generate_samples(loader, truncate_num_samples=truncate_num_samples)
 

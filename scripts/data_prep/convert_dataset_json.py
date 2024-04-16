@@ -49,6 +49,9 @@ def parse_args() -> Namespace:
     parser.add_argument("--max_tokens", type=int, default=None, required=False)
     parser.add_argument("--data_files_pattern", type=str, default="*")
     parser.add_argument("--data_files", type=str, default=None)
+    parser.add_argument("--write_batch_size", type=int, default=10_000)
+    parser.add_argument("--multi_process", default=False, action="store_true")
+    parser.add_argument("--shuffle", default=False, action="store_true")
 
     parsed = parser.parse_args()
 
@@ -87,6 +90,10 @@ def build_hf_dataset(
     tokenizer: PreTrainedTokenizerBase = None,
     data_files_pattern: str = "*",
     data_files: str | None = None,
+    write_batch_size: int = 10_000,
+    multi_process: bool = False,
+    shuffle: bool = False,
+    seed: int = 42,
 ) -> IterableDataset:
     """Build an IterableDataset over the HF C4 or pile source data.
 
@@ -108,7 +115,9 @@ def build_hf_dataset(
     if data_files is None:
         if os.path.isdir(path):
             match_string = f"{path}/{data_files_pattern}"
-            data_files = [f for f in glob(f"{path}/*") if re.search(match_string, f)]
+            data_files = [
+                f for f in glob(f"{path}/*.jsonl") if re.search(match_string, f)
+            ]
             # order data files by name
             data_files.sort()
         else:
@@ -117,7 +126,16 @@ def build_hf_dataset(
         data_files = data_files.split(",")
 
     print(f"Loading dataset from {data_files}")
-    hf_dataset = hf_datasets.load_dataset("json", data_files=data_files, split=split, cache_dir=False, num_proc=psutil.cpu_count(logical=True))
+    hf_dataset = hf_datasets.load_dataset(
+        "json",
+        data_files=data_files,
+        split=split,
+        cache_dir=False,
+        num_proc=psutil.cpu_count(logical=True),
+    )
+
+    if shuffle:
+        hf_dataset = hf_dataset.shuffle(seed=seed)
 
     if mode == ConcatMode.NO_CONCAT:
         dataset = NoConcatDataset(hf_dataset)
@@ -149,6 +167,8 @@ def build_hf_dataset(
             bos_text=bos_text,
             eos_text=eos_text,
             no_wrap=no_wrap,
+            multi_process=multi_process,
+            write_batch_size=write_batch_size,
         )
     return dataset
 
@@ -212,40 +232,74 @@ def main(args: Namespace) -> None:
         tokenizer=tokenizer,
         data_files_pattern=args.data_files_pattern,
         data_files=args.data_files,
+        write_batch_size=args.write_batch_size,
+        multi_process=args.multi_process,
+        shuffle=args.shuffle,
     )
 
     # Write samples
-    print(f"Converting to MDS format...")
+    print(f"Converting {args.path} to MDS format...")
     print(
-        f"Note that the progress bar is based on the dataset length before tokenization."
+        f"Note: the progress bar is based on the dataset length before tokenization, and may finish at a value before 100%."
     )
-    print(f"It will finish at a value below 100% if tokenizing")
     with MDSWriter(
         columns=columns, out=os.path.join(args.out_root), compression=args.compression
     ) as out:
-        if args.max_tokens is not None:
-            # we also want to count the number of tokens for the progress bar
-            processed_tokens = 0
-            progress_bar = tqdm(total=args.max_tokens)
-            try:
-                # for sample in tqdm(dataset):
-                for sample in dataset:
-                    processed_tokens += sample["num_tokens"]
-                    progress_bar.update(sample.pop("num_tokens"))
-                    out.write(sample)
-                    if processed_tokens >= args.max_tokens:
-                        print("Stopping early due to --max_tokens")
-                        break
-            except Exception as e:
-                print(f"Exception: {e}")
-                print(f"Processed {processed_tokens} tokens")
-        else:
-            for sample in tqdm(dataset):
+        # we also want to count the number of tokens for the progress bar
+        processed_tokens = 0
+        progress_bar = tqdm(total=args.max_tokens)
+        try:
+            for sample in dataset:
+                processed_tokens += sample["num_tokens"]
+                progress_bar.update(sample.pop("num_tokens"))
                 out.write(sample)
+                if args.max_tokens is not None and processed_tokens >= args.max_tokens:
+                    print("Stopping early due to --max_tokens")
+                    break
+        except Exception as e:
+            print(f"Exception: {e}")
+            print(f"Processed {processed_tokens} tokens")
 
-    print("Done!")
+        # elif args.max_tokens is not None:
+
+        # else:
+        #     for sample in tqdm(samples, desc=folder_split):
+        #         out.write(sample)
+
+    print(f"Finished converting {args.path} to MDS format.")
+    print("Finished converting all splits to MDS format.")
+
+    # # Write samples
+    # print(f"Converting to MDS format...")
+    # print(
+    #     f"Note that the progress bar is based on the dataset length before tokenization."
+    # )
+    # print(f"It will finish at a value below 100% if tokenizing")
+    # with MDSWriter(
+    #     columns=columns, out=os.path.join(args.out_root), compression=args.compression
+    # ) as out:
+    #     if args.max_tokens is not None:
+    #         # we also want to count the number of tokens for the progress bar
+    #         processed_tokens = 0
+    #         progress_bar = tqdm(total=args.max_tokens)
+    #         try:
+    #             # for sample in tqdm(dataset):
+    #             for sample in dataset:
+    #                 processed_tokens += sample["num_tokens"]
+    #                 progress_bar.update(sample.pop("num_tokens"))
+    #                 out.write(sample)
+    #                 if processed_tokens >= args.max_tokens:
+    #                     print("Stopping early due to --max_tokens")
+    #                     break
+    #         except Exception as e:
+    #             print(f"Exception: {e}")
+    #             print(f"Processed {processed_tokens} tokens")
+    #     else:
+    #         for sample in tqdm(dataset):
+    #             out.write(sample)
+
+    # print("Done!")
 
 
 if __name__ == "__main__":
-    os.environ["RAYON_NUM_THREADS"] = "16"
     main(parse_args())
