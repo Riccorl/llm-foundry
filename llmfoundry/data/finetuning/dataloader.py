@@ -4,7 +4,6 @@ import logging
 import os
 from typing import Tuple, Union
 
-import datasets as hf_datasets
 import torch
 from composer.core.data_spec import DataSpec
 from composer.utils import dist, get_file, parse_uri
@@ -12,15 +11,22 @@ from omegaconf import DictConfig
 from torch.utils.data import DataLoader
 from transformers import PreTrainedTokenizerBase
 
-from llmfoundry.data.finetuning.collator import Seq2SeqFinetuningCollator
-from llmfoundry.data.finetuning.tasks import dataset_constructor
+from llmfoundry.data.finetuning.collator import (Seq2SeqFinetuningCollator,
+                                                 validate_target_settings)
+from llmfoundry.data.finetuning.tasks import (DOWNLOADED_FT_DATASETS_DIRPATH,
+                                              SUPPORTED_EXTENSIONS,
+                                              dataset_constructor)
 from llmfoundry.data.packing import BinPackCollator, auto_packing_ratio
-from llmfoundry.data.text_data import get_tokens_per_batch_func
+from llmfoundry.data.text_data import build_streams, get_tokens_per_batch_func
 
 log = logging.getLogger(__name__)
 
 # HuggingFace hardcodes the ignore index to -100
 _HF_IGNORE_INDEX = -100
+
+# Default settings to use for target responses and target prompts
+_DEFAULT_TARGET_RESPONSES = 'last'
+_DEFAULT_TARGET_PROMPTS = 'none'
 
 
 def build_finetuning_dataloader(cfg: DictConfig,
@@ -71,6 +77,13 @@ def build_finetuning_dataloader(cfg: DictConfig,
             cfg.dataset.decoder_only_format (bool): Whether to format the
                 examples for a decoder-only model. See :class:`Seq2SeqFinetuningCollator`
                 docstring for details.
+            cfg.dataset.target_responses (str): Which responses are used as training targets.
+                Defaults to "last", meaning only the final response in multi-turn examples
+                will serve as training targets. See :class:`Seq2SeqFinetuningCollator` docstring for
+                details.
+            cfg.dataset.target_prompts (str): Which prompts are used as training targets.
+                Defaults to "none", meaning prompts are never used as training targets.
+                See :class:`Seq2SeqFinetuningCollator` docstring for details.
             cfg.dataset.allow_pad_trimming (bool, optional): Whether to allow
                 the collator to trim padding. See :class:`Seq2SeqFinetuningCollator`
                 docstring for details. Default: ``False``.
@@ -122,11 +135,19 @@ def build_finetuning_dataloader(cfg: DictConfig,
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
+    collate_fn, dataloader_batch_size = _build_collate_fn(
+        cfg, tokenizer, device_batch_size)
+
     dataset = None  # for pyright
-    if cfg.dataset.get('remote') is not None:
+    sampler = None
+    if cfg.dataset.get('remote') is not None or cfg.dataset.get(
+            'streams') is not None:
+        # Build streaming dataloader
+        streams = build_streams(cfg.dataset)
         dataset = dataset_constructor.build_from_streaming(
             tokenizer=tokenizer,
-            local=cfg.dataset.local,
+            streams=streams,
+            local=cfg.dataset.get('local', None),
             remote=cfg.dataset.get('remote', None),
             split=cfg.dataset.get('split', None),
             download_retry=cfg.dataset.get('download_retry', 2),
@@ -146,42 +167,51 @@ def build_finetuning_dataloader(cfg: DictConfig,
             sampling_method=cfg.dataset.get('sampling_method', 'balanced'),
             sampling_granularity=cfg.dataset.get('sampling_granularity', 1),
             batching_method=cfg.dataset.get('batching_method', 'random'),
-        )
-
-        collate_fn, dataloader_batch_size = _build_collate_fn(
-            cfg, tokenizer, device_batch_size)
-
-        dl = DataLoader(
-            dataset,
-            collate_fn=collate_fn,
-            batch_size=dataloader_batch_size,
-            drop_last=cfg.drop_last,
-            num_workers=cfg.num_workers,
-            pin_memory=cfg.get('pin_memory', True),
-            prefetch_factor=cfg.get('prefetch_factor', 2),
-            persistent_workers=cfg.get('persistent_workers', True),
-            timeout=cfg.get('timeout', 0),
+            max_seq_len=cfg.dataset.max_seq_len,
         )
 
     else:
-        backend, _, _ = parse_uri(cfg.dataset.hf_name)
+        # Build HF dataloader
+        dataset_name_or_path = cfg.dataset.hf_name
+        split = cfg.dataset.get('split')
+
+        # If dataset is a remote path, download it first.
+        backend, _, _ = parse_uri(dataset_name_or_path)
         if backend not in ['', None]:
-            if cfg.dataset.get('split') is None:
+            if split is None:
                 raise ValueError(
                     'When using a HuggingFace dataset from a URL, you must set the ' + \
                     '`split` key in the dataset config.'
                 )
-            dataset = _build_hf_dataset_from_remote(cfg, tokenizer)
+            dataset_name_or_path = _download_remote_hf_dataset(
+                remote_path=dataset_name_or_path, split=split)
+            split = split.replace('-', '_')
+
+        # Get the preprocessing function.
+        proto_preprocessing_fn = cfg.dataset.get('preprocessing_fn')
+        if isinstance(proto_preprocessing_fn, (dict, DictConfig)):
+            preprocessing_fn = dataset_constructor.get_preprocessing_fn_from_dict(
+                dict(proto_preprocessing_fn))
         else:
-            dataset = dataset_constructor.build_from_hf(
-                cfg.dataset,
-                max_seq_len=cfg.dataset.max_seq_len,
-                tokenizer=tokenizer,
-            )
+            preprocessing_fn = dataset_constructor.get_preprocessing_fn_from_str(
+                proto_preprocessing_fn, dataset_name_or_path)
 
-        collate_fn, dataloader_batch_size = _build_collate_fn(
-            cfg, tokenizer, device_batch_size)
+        # Build dataset from HF.
+        dataset = dataset_constructor.build_from_hf(
+            dataset_name=dataset_name_or_path,
+            split=split,
+            safe_load=cfg.dataset.get('safe_load', False),
+            max_seq_len=cfg.dataset.max_seq_len,
+            preprocessing_fn=preprocessing_fn,
+            tokenizer=tokenizer,
+            target_prompts=cfg.dataset.get('target_prompts',
+                                           _DEFAULT_TARGET_PROMPTS),
+            target_responses=cfg.dataset.get('target_responses',
+                                             _DEFAULT_TARGET_RESPONSES),
+            decoder_only_format=cfg.dataset.decoder_only_format,
+            hf_kwargs=cfg.dataset.get('hf_kwargs', {}))
 
+        # Ensure dataset is large enough.
         if cfg.drop_last:
             world_size = dist.get_world_size()
             minimum_dataset_size = world_size * dataloader_batch_size
@@ -189,7 +219,7 @@ def build_finetuning_dataloader(cfg: DictConfig,
                 full_dataset_size = len(dataset)
                 if full_dataset_size < minimum_dataset_size:
                     raise ValueError(
-                        f'Your dataset (name={cfg.dataset.hf_name}, split={cfg.dataset.split}) '
+                        f'Your dataset (name={cfg.dataset.hf_name}, split={split}) '
                         +
                         f'has {full_dataset_size} samples, but your minimum batch size '
                         +
@@ -199,22 +229,24 @@ def build_finetuning_dataloader(cfg: DictConfig,
                         +
                         f'of samples in your dataset to at least {minimum_dataset_size}.'
                     )
+        # Initialize sampler.
+        sampler = dist.get_sampler(dataset,
+                                   drop_last=cfg.drop_last,
+                                   shuffle=cfg.dataset.shuffle)
 
-        assert dataset is not None
-        dl = DataLoader(
-            dataset,
-            collate_fn=collate_fn,
-            batch_size=dataloader_batch_size,
-            drop_last=cfg.drop_last,
-            sampler=dist.get_sampler(dataset,
-                                     drop_last=cfg.drop_last,
-                                     shuffle=cfg.dataset.shuffle),
-            num_workers=cfg.num_workers,
-            pin_memory=cfg.get('pin_memory', True),
-            prefetch_factor=cfg.get('prefetch_factor', 2),
-            persistent_workers=cfg.get('persistent_workers', True),
-            timeout=cfg.get('timeout', 0),
-        )
+    assert dataset is not None  # for pyright
+    dl = DataLoader(
+        dataset,
+        collate_fn=collate_fn,
+        batch_size=dataloader_batch_size,
+        drop_last=cfg.drop_last,
+        sampler=sampler,
+        num_workers=cfg.num_workers,
+        pin_memory=cfg.get('pin_memory', True),
+        prefetch_factor=cfg.get('prefetch_factor', 2),
+        persistent_workers=cfg.get('persistent_workers', True),
+        timeout=cfg.get('timeout', 0),
+    )
 
     token_counting_func = get_tokens_per_batch_func()
 
@@ -250,7 +282,7 @@ def _validate_config(dataset_cfg: DictConfig) -> None:
             )
     elif dataset_cfg.get('remote') is not None:
         # Using the streaming dataset codepath
-        illegal_keys = ['hf_name', 'hf_kwargs', 'preprocessing_fn']
+        illegal_keys = ['hf_name', 'hf_kwargs', 'preprocessing_fn', 'safe_load']
         discovered_illegal_keys = []
         for key in illegal_keys:
             if dataset_cfg.get(key) is not None:
@@ -267,19 +299,56 @@ def _validate_config(dataset_cfg: DictConfig) -> None:
                 'Using a streaming dataset requires setting both `remote` and `local`, ' +\
                 'but dataset.local is None.'
             )
+    elif dataset_cfg.get('streams') is not None:
+        # Using the streaming dataset codepath
+        illegal_keys = ['hf_name', 'hf_kwargs', 'preprocessing_fn', 'safe_load']
+        discovered_illegal_keys = []
+        for key in illegal_keys:
+            if dataset_cfg.get(key) is not None:
+                discovered_illegal_keys.append('`' + key + '`')
+        if discovered_illegal_keys:
+            raise ValueError(
+                'The dataset config sets a value for `streams` as well as the ' +\
+                f'following keys: {", ".join(discovered_illegal_keys)}.\n' +\
+                'Those keys are used when building from a HuggingFace dataset, but ' +\
+                'setting `streams` instructs the dataset to build from a streaming dataset.'
+            )
+        illegal_keys = ['remote', 'local']
+        discovered_illegal_keys = []
+        for key in illegal_keys:
+            if dataset_cfg.get(key) is not None:
+                discovered_illegal_keys.append('`' + key + '`')
+        if discovered_illegal_keys:
+            raise ValueError(
+                'The dataset config sets a value for `streams` as well as the ' +\
+                f'following keys: {", ".join(discovered_illegal_keys)}.\n' +\
+                'Please either use single stream (set remote/local only) ' +\
+                'or put remote/local under streams'
+            )
+
     else:
         raise ValueError(
-            'In the dataset config, you must set either `hf_name` to use a ' +\
-            'HuggingFace dataset or set `remote` to use a streaming ' +\
-            'dataset, but both were None.'
+            'In the dataset config, you must set `hf_name` to use a HuggingFace ' +\
+            'dataset, or set `remote` to use a streaming dataset, or set ' +\
+            '`streams` to use multiple streaming datasets,  but all were None.'
         )
+    if dataset_cfg.get('max_seq_len') is None:
+        raise ValueError(
+            'In the dataset config, you must set the `max_seq_len`')
+
+    # Raise an error if the target_prompts + target_responses + decoder_only_format settings
+    # are invalid
+    target_responses = str(
+        dataset_cfg.get('target_responses', _DEFAULT_TARGET_RESPONSES)).lower()
+    target_prompts = str(
+        dataset_cfg.get('target_prompts', _DEFAULT_TARGET_PROMPTS)).lower()
+    decoder_only_format = dataset_cfg.decoder_only_format
+    validate_target_settings(target_prompts, target_responses,
+                             decoder_only_format)
 
 
-def _build_hf_dataset_from_remote(
-    cfg: DictConfig, tokenizer: PreTrainedTokenizerBase
-) -> Union[hf_datasets.DatasetDict, hf_datasets.Dataset,
-           hf_datasets.IterableDatasetDict, hf_datasets.IterableDataset]:
-    """Builds a dataset from a remote object store.
+def _download_remote_hf_dataset(remote_path: str, split: str) -> str:
+    """Downloads a dataset from a remote object store.
 
     This function supports 'jsonl', 'csv', and 'parquet' file formats for the dataset. It will attempt to download
     the dataset, then once it is downloaded, convert it into HuggingFace ``datasets`` format, and then return this
@@ -290,38 +359,29 @@ def _build_hf_dataset_from_remote(
     completed, the function removes the signal file.
 
     Args:
-        cfg (DictConfig): The configuration dictionary containing the necessary parameters to load the dataset.
-            This includes:
-                - dataset.hf_name: The path of the HuggingFace dataset to download.
-                - dataset.split: The dataset split to download (e.g., 'train', 'validation', 'test').
-                - dataset.max_seq_len: The maximum sequence length for tokenizing the dataset.
-
-        tokenizer (Tokenizer): The tokenizer to be used to tokenize the dataset.
+        hf_name (str): The path of the HuggingFace dataset to download.
+        split (str): The dataset split to download (e.g., 'train', 'validation', 'test').
 
     Returns:
-        Dataset: A HuggingFace dataset built from the remote file, prepared and tokenized for fine-tuning the model.
+        A local directory path where the dataset files are stored.
 
     Raises:
         FileNotFoundError: Raised if the dataset file cannot be found with any of the supported extensions.
     """
-    supported_extensions = ['jsonl', 'csv', 'parquet']
-    # HF datasets does not support a split with dashes, so we replace dashes
-    # with underscores in the destination split.
-    destination_split = cfg.dataset.split.replace('-', '_')
+    # HF datasets does not support a split with dashes, so we replace dashes with underscores.
+    hf_formatted_split = split.replace('-', '_')
     finetune_dir = os.path.join(
-        os.path.dirname(
-            os.path.dirname(os.path.dirname(os.path.realpath(__file__)))),
-        'downloaded_finetuning',
-        destination_split if destination_split != 'data' else 'data_not',
+        DOWNLOADED_FT_DATASETS_DIRPATH,
+        hf_formatted_split if hf_formatted_split != 'data' else 'data_not',
     )
     os.makedirs(finetune_dir, exist_ok=True)
-    for extension in supported_extensions:
-        name = f'{cfg.dataset.hf_name.strip("/")}/{cfg.dataset.split}.{extension}'
+    for extension in SUPPORTED_EXTENSIONS:
+        name = f'{remote_path.strip("/")}/{split}{extension}'
         destination = str(
             os.path.abspath(
                 os.path.join(
                     finetune_dir, 'data',
-                    f'{destination_split}-00000-of-00001.{extension}')))
+                    f'{hf_formatted_split}-00000-of-00001{extension}')))
 
         # Since we don't know exactly what the extension will be, since it is one of a list
         # use a signal file to wait for instead of the desired file
@@ -331,14 +391,14 @@ def _build_hf_dataset_from_remote(
             try:
                 get_file(path=name, destination=destination, overwrite=True)
             except FileNotFoundError as e:
-                if extension == supported_extensions[-1]:
+                if extension == SUPPORTED_EXTENSIONS[-1]:
                     files_searched = [
-                        f'{cfg.dataset.hf_name}/{cfg.dataset.split}.{ext}'
-                        for ext in supported_extensions
+                        f'{cfg.dataset.hf_name}/{cfg.dataset.split}{ext}'
+                        for ext in SUPPORTED_EXTENSIONS
                     ]
                     raise FileNotFoundError(
                         f'Could not find a file with any of ' + \
-                        f'the supported extensions: {supported_extensions}\n' + \
+                        f'the supported extensions: {SUPPORTED_EXTENSIONS}\n' + \
                         f'at {files_searched}'
                     ) from e
                 else:
@@ -350,25 +410,18 @@ def _build_hf_dataset_from_remote(
             with open(signal_file_path, 'wb') as f:
                 f.write(b'local_rank0_completed_download')
 
-        # Avoid the collective call until the local rank zero has finished trying to download the checkpoint
+        # Avoid the collective call until the local rank zero has finished trying to download the dataset
         # so that we don't timeout for large downloads. This syncs all processes on the node
         with dist.local_rank_zero_download_and_wait(signal_file_path):
-            # Then, wait to ensure every node has finished downloading the checkpoint
+            # Then, wait to ensure every node has finished trying to download the dataset
             dist.barrier()
 
         # clean up signal file
         if dist.get_local_rank() == 0:
             os.remove(signal_file_path)
         dist.barrier()
-
-        cfg.dataset.hf_name = finetune_dir
-        log.info(cfg.dataset)
-        dataset = dataset_constructor.build_from_hf(
-            cfg.dataset,
-            max_seq_len=cfg.dataset.max_seq_len,
-            tokenizer=tokenizer,
-        )
-        return dataset
+        break
+    return finetune_dir
 
 
 def _build_collate_fn(
@@ -382,6 +435,10 @@ def _build_collate_fn(
         tokenizer=tokenizer,
         max_seq_len=max_seq_len,
         decoder_only_format=dataset_cfg.decoder_only_format,
+        target_responses=dataset_cfg.get('target_responses',
+                                         _DEFAULT_TARGET_RESPONSES),
+        target_prompts=dataset_cfg.get('target_prompts',
+                                       _DEFAULT_TARGET_PROMPTS),
         allow_pad_trimming=dataset_cfg.get('allow_pad_trimming', False),
     )
 
@@ -447,19 +504,21 @@ if __name__ == '__main__':
                 2048,
             'decoder_only_format':
                 True,
-            'separator_text':
-                False,
             'allow_pad_trimming':
                 False,
             'num_canonical_nodes':
                 472,
             'shuffle':
                 True,
+            'target_responses':
+                'last',
+            'target_prompts':
+                'none',
         },
         'drop_last': False,
         'num_workers': 0,
         'pin_memory': False,
-        'prefetch_factor': 2,
+        'prefetch_factor': None,
         'persistent_workers': False,
         'timeout': 0
     })
@@ -468,7 +527,7 @@ if __name__ == '__main__':
     tokenizer_kwargs = {'model_max_length': cfg.dataset.max_seq_len}
     tokenizer = build_tokenizer(tokenizer_name, tokenizer_kwargs)
 
-    device_batch_size = 2
+    device_batch_size = 1
     dataloader = build_finetuning_dataloader(cfg, tokenizer,
                                              device_batch_size).dataloader
 
@@ -496,7 +555,8 @@ if __name__ == '__main__':
                                 torch.logical_and(
                                     is_subseq, batch['attention_mask'][j] ==
                                     1)],
-                                             skip_special_tokens=False))
+                                             skip_special_tokens=False,
+                                             clean_up_tokenization_spaces=True))
                         print(
                             '\033[92m{}\033[00m\n'.format('CONTEXT:  '),
                             tokenizer.decode(batch['input_ids'][
@@ -504,7 +564,8 @@ if __name__ == '__main__':
                                 torch.logical_and(
                                     is_subseq, batch['bidirectional_mask'][j] ==
                                     1)],
-                                             skip_special_tokens=False))
+                                             skip_special_tokens=False,
+                                             clean_up_tokenization_spaces=True))
                         print(
                             '\033[91m{}\033[00m\n'.format('TARGET:   '),
                             tokenizer.decode(batch['input_ids'][
@@ -512,33 +573,39 @@ if __name__ == '__main__':
                                 torch.logical_and(
                                     is_subseq,
                                     batch['labels'][j] != _HF_IGNORE_INDEX)],
-                                             skip_special_tokens=False))
+                                             skip_special_tokens=False,
+                                             clean_up_tokenization_spaces=True))
                 else:
                     print(
                         '\033[93m{}\033[00m\n'.format('INPUT IDS:'),
                         tokenizer.decode(
                             batch['input_ids'][j,
                                                batch['attention_mask'][j] == 1],
-                            skip_special_tokens=False))
+                            skip_special_tokens=False,
+                            clean_up_tokenization_spaces=True))
                     print(
                         '\033[92m{}\033[00m\n'.format('CONTEXT:  '),
                         tokenizer.decode(batch['input_ids'][
                             j, batch['bidirectional_mask'][j] == 1],
-                                         skip_special_tokens=False))
+                                         skip_special_tokens=False,
+                                         clean_up_tokenization_spaces=True))
                     print(
                         '\033[91m{}\033[00m\n'.format('TARGET:   '),
                         tokenizer.decode(batch['input_ids'][
                             j, batch['labels'][j] != _HF_IGNORE_INDEX],
-                                         skip_special_tokens=False))
+                                         skip_special_tokens=False,
+                                         clean_up_tokenization_spaces=True))
             else:
                 print(
                     '\033[92m{}\033[00m\n'.format('CONTEXT:  '),
                     tokenizer.decode(
                         batch['input_ids'][j, batch['attention_mask'][j] == 1],
-                        skip_special_tokens=False))
+                        skip_special_tokens=False,
+                        clean_up_tokenization_spaces=True))
                 print(
                     '\033[91m{}\033[00m\n'.format('TARGET:   '),
                     tokenizer.decode(batch['labels'][
                         j, batch['decoder_attention_mask'][j] == 1],
-                                     skip_special_tokens=False))
+                                     skip_special_tokens=False,
+                                     clean_up_tokenization_spaces=True))
         print('   ')

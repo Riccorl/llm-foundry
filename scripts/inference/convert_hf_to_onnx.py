@@ -33,31 +33,28 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
 import torch
-from composer.utils import (
-    maybe_create_object_store_from_uri,
-    parse_uri,
-    reproducibility,
-)
+from composer.utils import (maybe_create_object_store_from_uri, parse_uri,
+                            reproducibility)
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
 
 def str2bool(v: Union[str, bool]):
     if isinstance(v, bool):
         return v
-    if v.lower() in ("yes", "true", "t", "y", "1"):
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
         return True
-    elif v.lower() in ("no", "false", "f", "n", "0"):
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
         return False
     else:
-        raise ArgumentTypeError("Boolean value expected.")
+        raise ArgumentTypeError('Boolean value expected.')
 
 
 def str_or_bool(v: Union[str, bool]):
     if isinstance(v, bool):
         return v
-    if v.lower() in ("yes", "true", "t", "y", "1"):
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
         return True
-    elif v.lower() in ("no", "false", "f", "n", "0"):
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
         return False
     else:
         return v
@@ -66,13 +63,15 @@ def str_or_bool(v: Union[str, bool]):
 def gen_random_batch(batch_size: int, vocab_size: int, max_seq_len: int):
     # generate input batch of random data
     batch = {
-        "input_ids": torch.randint(
-            low=0,
-            high=vocab_size,
-            size=(batch_size, max_seq_len),
-            dtype=torch.int64,
-        ),
-        "attention_mask": torch.ones(size=(batch_size, max_seq_len), dtype=torch.bool),
+        'input_ids':
+            torch.randint(
+                low=0,
+                high=vocab_size,
+                size=(batch_size, max_seq_len),
+                dtype=torch.int64,
+            ),
+        'attention_mask':
+            torch.ones(size=(batch_size, max_seq_len), dtype=torch.bool)
     }
     return batch
 
@@ -89,33 +88,31 @@ def export_to_onnx(
     save_object_store = maybe_create_object_store_from_uri(output_folder)
     _, _, parsed_save_path = parse_uri(output_folder)
 
-    print("Loading HF config/model/tokenizer...")
-    tokenizer = AutoTokenizer.from_pretrained(
-        pretrained_model_name_or_path, **from_pretrained_kwargs
-    )
-    config = AutoConfig.from_pretrained(
-        pretrained_model_name_or_path, **from_pretrained_kwargs
-    )
+    print('Loading HF config/model/tokenizer...')
+    tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name_or_path,
+                                              **from_pretrained_kwargs)
+    config = AutoConfig.from_pretrained(pretrained_model_name_or_path,
+                                        **from_pretrained_kwargs)
 
     # specifically for MPT, switch to the torch version of attention for ONNX export
-    if hasattr(config, "attn_config"):
-        config.attn_config["attn_impl"] = "torch"
+    if hasattr(config, 'attn_config'):
+        config.attn_config['attn_impl'] = 'torch'
 
-    model = AutoModelForCausalLM.from_pretrained(
-        pretrained_model_name_or_path, config=config, **from_pretrained_kwargs
-    )
+    model = AutoModelForCausalLM.from_pretrained(pretrained_model_name_or_path,
+                                                 config=config,
+                                                 **from_pretrained_kwargs)
     model.eval()
 
-    if max_seq_len is None and not hasattr(model.config, "max_seq_len"):
+    if max_seq_len is None and not hasattr(model.config, 'max_seq_len'):
         raise ValueError(
-            "max_seq_len must be specified in either the model config or as an argument to this function."
+            'max_seq_len must be specified in either the model config or as an argument to this function.'
         )
     elif max_seq_len is None:
         max_seq_len = model.config.max_seq_len
 
     assert isinstance(max_seq_len, int)  # pyright
 
-    print("Creating random batch...")
+    print('Creating random batch...')
     sample_input = gen_random_batch(
         export_batch_size,
         len(tokenizer),
@@ -125,15 +122,15 @@ def export_to_onnx(
     with torch.no_grad():
         model(**sample_input)
 
-    output_file = Path(parsed_save_path) / "model.onnx"
+    output_file = Path(parsed_save_path) / 'model.onnx'
     os.makedirs(parsed_save_path, exist_ok=True)
-    print("Exporting the model with ONNX...")
+    print('Exporting the model with ONNX...')
     torch.onnx.export(
         model,
         (sample_input,),
         str(output_file),
-        input_names=["input_ids", "attention_mask"],
-        output_names=["output"],
+        input_names=['input_ids', 'attention_mask'],
+        output_names=['output'],
         opset_version=16,
     )
 
@@ -161,60 +158,62 @@ def export_to_onnx(
             loaded_model_out[0],
             rtol=1e-2,
             atol=1e-2,
-            msg=f"output mismatch between the orig and onnx exported model",
+            msg=f'output mismatch between the orig and onnx exported model',
         )
-        print("exported model ouptut matches with unexported model!!")
+        print('exported model ouptut matches with unexported model!!')
 
     if save_object_store is not None:
-        print("Uploading files to object storage...")
+        print('Uploading files to object storage...')
         for filename in os.listdir(parsed_save_path):
             full_path = str(Path(parsed_save_path) / filename)
             save_object_store.upload_object(full_path, full_path)
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(
-        description="Convert HF model to ONNX",
-    )
+    parser = argparse.ArgumentParser(description='Convert HF model to ONNX',)
     parser.add_argument(
-        "--pretrained_model_name_or_path",
+        '--pretrained_model_name_or_path',
         type=str,
         required=True,
     )
     parser.add_argument(
-        "--output_folder",
+        '--output_folder',
         type=str,
         required=True,
     )
     parser.add_argument(
-        "--export_batch_size",
+        '--export_batch_size',
         type=int,
         default=8,
     )
     parser.add_argument(
-        "--max_seq_len",
+        '--max_seq_len',
         type=int,
         default=None,
     )
     parser.add_argument(
-        "--verify_export",
-        action="store_true",
+        '--verify_export',
+        action='store_true',
     )
-    parser.add_argument(
-        "--trust_remote_code", type=str2bool, nargs="?", const=True, default=True
-    )
-    parser.add_argument(
-        "--use_auth_token", type=str_or_bool, nargs="?", const=True, default=None
-    )
-    parser.add_argument("--revision", type=str, default=None)
+    parser.add_argument('--trust_remote_code',
+                        type=str2bool,
+                        nargs='?',
+                        const=True,
+                        default=True)
+    parser.add_argument('--use_auth_token',
+                        type=str_or_bool,
+                        nargs='?',
+                        const=True,
+                        default=None)
+    parser.add_argument('--revision', type=str, default=None)
     return parser.parse_args()
 
 
 def main(args: argparse.Namespace):
     from_pretrained_kwargs = {
-        "use_auth_token": args.use_auth_token,
-        "trust_remote_code": args.trust_remote_code,
-        "revision": args.revision,
+        'use_auth_token': args.use_auth_token,
+        'trust_remote_code': args.trust_remote_code,
+        'revision': args.revision,
     }
 
     export_to_onnx(
@@ -223,9 +222,8 @@ def main(args: argparse.Namespace):
         export_batch_size=args.export_batch_size,
         max_seq_len=args.max_seq_len,
         verify_export=args.verify_export,
-        from_pretrained_kwargs=from_pretrained_kwargs,
-    )
+        from_pretrained_kwargs=from_pretrained_kwargs)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main(parse_args())

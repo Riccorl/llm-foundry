@@ -1,13 +1,13 @@
 #!/bin/bash
-#SBATCH --job-name=minestral-3B-165B_it-330B_en-cx-16032024-16train            # Job name
-#SBATCH -o logs/minestral-3B-165B_it-330B_en-cx-16032024/train-16job.out       # Name of stdout output file
-#SBATCH -e logs/minestral-3B-165B_it-330B_en-cx-16032024/train-16job.err       # Name of stderr error file
+#SBATCH --job-name=minestral-3B-165B_it-330B_en-cx-13042024-32train-5         # Job name
+#SBATCH -o logs/minestral-3B-165B_it-330B_en-cx-13042024/train-32job5.out       # Name of stdout output file
+#SBATCH -e logs/minestral-3B-165B_it-330B_en-cx-13042024/train-32job5.err       # Name of stderr error file
 
 #SBATCH -A IscrB_medit
 #SBATCH -p boost_usr_prod
 #SBATCH --time 24:00:00  
-#SBATCH -N 16
-#SBATCH --ntasks=16
+#SBATCH -N 32
+#SBATCH --ntasks=32
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=8
 #SBATCH --gres=gpu:4
@@ -17,11 +17,12 @@ master_port=11111
 master_addr=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
 
 module load profile/deeplrn culturax/2309
-module load openmpi/4.1.4--gcc--11.3.0-cuda-11.8 zlib/1.2.13--gcc--11.3.0 cuda/11.8
+# module load openmpi/4.1.4--gcc--11.3.0-cuda-11.8 zlib/1.2.13--gcc--11.3.0 cuda/11.8
+module load zlib/1.3--gcc--12.2.0 cuda/12.1
 
-source ~/llmfoundry-cuda-flash-attn2-env/bin/activate
+source ~/llmfoundry-0.6.0/bin/activate
 
-cd /leonardo/home/userexternal/rorland1/llm-foundry
+cd /leonardo/home/userexternal/rorland1/llm-foundry-0.6.0
 
 export NPROCS=4  # number of GPUs per node
 export MASTER_ADDR=$master_addr

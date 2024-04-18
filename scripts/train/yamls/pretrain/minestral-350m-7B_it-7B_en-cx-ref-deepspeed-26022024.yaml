@@ -9,19 +9,19 @@ run_name: minestral-350m-7B_it-7B_en-cx-ref-deepspeed-26022024 # If left blank, 
 
 # Model
 model:
-  use_auth_token: ${oc.env:HF_TOKEN}
+  use_auth_token: ${oc.env:HF_TOKEN} # ${oc.env:HF_TOKEN}
   name: hf_causal_lm
   pretrained_model_name_or_path: mistralai/Mistral-7B-v0.1
   use_flash_attention_2: True
   config_overrides:
-    # Params: 473_470_464 
+    # Params: 473_470_464
     # intermediate_size: 5376 # 3.5 * hidden_size
     # hidden_size: 1536
     # num_attention_heads: 12
     # num_hidden_layers: 12
     # num_key_value_heads: 4
 
-    # Params: 351_573_120 
+    # Params: 351_573_120
     intermediate_size: 4032 # 3.5 * hidden_size
     hidden_size: 1152
     num_attention_heads: 16
@@ -86,8 +86,8 @@ optimizer:
   name: decoupled_adamw
   lr: 3.0e-4
   betas:
-  - 0.9
-  - 0.95
+    - 0.9
+    - 0.95
   eps: 1.0e-08
   weight_decay: 0.0
 
@@ -97,7 +97,7 @@ algorithms:
     clipping_threshold: 1.0
 
 # max_duration = num_tokens / (max_seq_len * global_train_batch_size)
-# ~14B tokens = max_seq_len * global_train_batch_size * max_duration 
+# ~14B tokens = max_seq_len * global_train_batch_size * max_duration
 # 14B is 14000000000
 max_duration: 13352ba #  global_train_batch_size: 512
 eval_interval: 1000ba
@@ -115,23 +115,23 @@ precision: amp_bf16
 # precision: fp32 # for debugging in cpu
 
 # FSDP
-# fsdp_config:
-#   sharding_strategy: FULL_SHARD
-#   mixed_precision: PURE
-#   activation_checkpointing: False
-#   activation_checkpointing_reentrant: false
-#   activation_cpu_offload: false
-#   limit_all_gathers: true
+fsdp_config:
+  sharding_strategy: FULL_SHARD
+  mixed_precision: PURE
+  activation_checkpointing: false
+  activation_checkpointing_reentrant: false
+  activation_cpu_offload: false
+  limit_all_gathers: true
 
 # DeepSpeed
-deepspeed_config:
-  train_batch_size: 512
-  train_micro_batch_size_per_gpu: 16
-  gradient_accumulation_steps: 8       # 512/16/4 = 8
-  bfloat16:
-    enabled: True
-  zero_optimization:
-    stage: 3
+# deepspeed_config:
+#   train_batch_size: 512
+#   train_micro_batch_size_per_gpu: 16
+#   gradient_accumulation_steps: 8       # 512/16/4 = 8
+#   bfloat16:
+#     enabled: True
+#   zero_optimization:
+#     stage: 3
 
 # Logging
 progress_bar: true
@@ -156,8 +156,8 @@ loggers:
 
 # Checkpoint to local filesystem or remote object store
 save_interval: 100ba
-save_num_checkpoints_to_keep: 3  # Important, this cleans up checkpoints saved to DISK
-save_folder:  /leonardo_scratch/large/userexternal/rorland1/llm-foundry/runs/{run_name}
+save_num_checkpoints_to_keep: 3 # Important, this cleans up checkpoints saved to DISK
+save_folder: /leonardo_scratch/large/userexternal/rorland1/llm-foundry/runs/{run_name}
 # save_folder: s3://my-bucket/my-folder/{run_name}/checkpoints
 
 # Load from local filesystem or remote object store

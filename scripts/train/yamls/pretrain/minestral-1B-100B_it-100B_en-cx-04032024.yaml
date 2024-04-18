@@ -1,12 +1,12 @@
-# data_local: /leonardo_scratch/large/userexternal/rorland1/data/minestral-1B-100B_it-100B_en-cx-04032024/data/processed
-data_local: /leonardo_scratch/fast/IscrB_medit/data/minestral-1B-100B_it-100B_en-cx-04032024/data/processed
+data_local: /leonardo_scratch/large/userexternal/rorland1/data/minestral-1B-100B_it-100B_en-cx-04032024/data/processed
+# data_local: /leonardo_scratch/fast/IscrB_medit/data/minestral-1B-100B_it-100B_en-cx-04032024/data/processed
 data_remote: # If blank, files must be present in data_local
 max_seq_len: 2048
 global_seed: 17
 # num_cpus_per_node: 8
 
 # Run Name
-run_name: minestral-1B-100B_it-100B_en-cx-04032024-16 # If left blank, will be read from env var $RUN_NAME
+run_name: minestral-1B-100B_it-100B_en-cx-deepspeed-04032024 # If left blank, will be read from env var $RUN_NAME
 
 # Model
 model:
@@ -38,6 +38,7 @@ train_loader:
   drop_last: true
   num_workers: 8
   dataset:
+    predownload: 16384 # 8 * batch size
     shuffle: True
     num_canonical_nodes: 8
     shuffle_block_size: 262144
@@ -103,8 +104,8 @@ global_train_batch_size: 2048
 # System
 seed: ${global_seed}
 device_eval_batch_size: 16
-# device_train_microbatch_size: 4
-device_train_microbatch_size: auto
+device_train_microbatch_size: 8
+# device_train_microbatch_size: auto
 precision: amp_bf16
 # precision: fp32 # for debugging in cpu
 
@@ -116,6 +117,16 @@ fsdp_config:
   activation_checkpointing_reentrant: false
   activation_cpu_offload: false
   limit_all_gathers: true
+
+# DeepSpeed
+# deepspeed_config:
+#   train_batch_size: 2048
+#   train_micro_batch_size_per_gpu: 8
+#   gradient_accumulation_steps: 8       # 2048/8/32 = 8 micro_batch_per_gpu * gradient_acc_step * world_size
+#   bfloat16:
+#     enabled: True
+#   zero_optimization:
+#     stage: 3
 
 # Logging
 progress_bar: true

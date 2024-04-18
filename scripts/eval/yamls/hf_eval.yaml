@@ -1,10 +1,9 @@
-max_seq_len: 2048
+max_seq_len: 1024
 seed: 1
 precision: fp32
 
 # If you are using one model, put it here:
-# model_name_or_path: EleutherAI/gpt-neo-125m
-model_name_or_path: /leonardo_scratch/large/userexternal/rorland1/checkpoints/minestral-350m-7B_it-7B_en-hq-cx-ref-22022024
+model_name_or_path: EleutherAI/gpt-neo-125m
 # otherwise, write a block for each model you want to test in the `models` section
 
 models:
@@ -15,7 +14,6 @@ models:
     pretrained_model_name_or_path: ${model_name_or_path}
     init_device: mixed
     pretrained: true
-    use_flash_attention_2: false
   tokenizer:
     name: ${model_name_or_path}
     kwargs:
@@ -45,5 +43,5 @@ fsdp_config:
   forward_prefetch: True
   limit_all_gathers: True
 
-icl_tasks: 'eval/yamls/tasks_v0.1.yaml'
-# eval_gauntlet: 'eval/yamls/eval_gauntlet_v0.1.yaml'
+icl_tasks: "eval/yamls/tasks_v0.3.yaml"
+eval_gauntlet: "eval/yamls/eval_gauntlet_v0.3.yaml"

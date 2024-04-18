@@ -12,23 +12,14 @@ from composer.core.precision import get_precision_context
 from composer.utils import reproducibility
 from omegaconf import DictConfig
 from omegaconf import OmegaConf as om
+from transformers.models.llama.modeling_llama import LlamaAttention
 
 from llmfoundry import COMPOSER_MODEL_REGISTRY
 from llmfoundry.models.hf.hf_fsdp import rgetattr
-from llmfoundry.models.layers.attention import (is_flash_v1_installed,
-                                                is_flash_v2_installed)
-from llmfoundry.utils.builders import build_tokenizer
-
-# Before importing any transformers models, we need to disable transformers flash attention if
-# we are in an environment with flash attention version <2. Transformers hard errors on a not properly
-# gated import otherwise.
-if is_flash_v1_installed():
-    transformers.utils.is_flash_attn_available = lambda: False
-
-from transformers.models.llama.modeling_llama import LlamaAttention
-
+from llmfoundry.models.layers.attention import is_flash_v2_installed
 from llmfoundry.models.layers.llama_attention_monkeypatch import (
     llama_attention_patch_torch, llama_attention_patch_triton)
+from llmfoundry.utils.builders import build_tokenizer
 
 
 @pytest.mark.parametrize('patch_fn_name', ['torch', 'triton'])
@@ -159,9 +150,11 @@ def test_attn_patch_integration(patch: str):
 
 
 @pytest.mark.gpu
+@pytest.mark.world_size(2)
 @pytest.mark.parametrize('model_name', ['llama2', 'mistral'])
 @pytest.mark.parametrize('use_flash_attention_2', [True, False])
-def test_flash2(model_name: str, use_flash_attention_2: bool):
+@pytest.mark.parametrize('init_device', ['cpu', 'mixed', 'meta'])
+def test_flash2(model_name: str, use_flash_attention_2: bool, init_device: str):
     if model_name == 'llama2':
         if 'HUGGING_FACE_HUB_TOKEN' not in os.environ:
             pytest.skip(
@@ -177,7 +170,7 @@ def test_flash2(model_name: str, use_flash_attention_2: bool):
             },
             'use_auth_token': True,
             'pretrained': False,
-            'init_device': 'cpu',
+            'init_device': init_device,
         }
 
         tokenizer_name = 'meta-llama/Llama-2-7b-hf'
@@ -228,21 +221,27 @@ def test_flash2(model_name: str, use_flash_attention_2: bool):
         model = COMPOSER_MODEL_REGISTRY[model_cfg['name']](model_cfg, tokenizer)
 
         # check that it actually used flash attention 2
-        assert model.model.config._flash_attn_2_enabled if use_flash_attention_2 else not model.model.config._flash_attn_2_enabled
+        assert model.model.config._attn_implementation == (
+            'flash_attention_2' if use_flash_attention_2 else 'eager')
         attention_layer = rgetattr(
             rgetattr(model, attention_layers_attr)[0], attention_attr)
         assert isinstance(attention_layer, flash_attn_class)
 
-        tokenized_input = tokenizer(['Hello world blah blah', 'Goodbye world'],
-                                    return_tensors='pt',
-                                    padding=True)
-        tokenized_input['labels'] = tokenized_input['input_ids'].clone()
+        # Skip attempting to run forward/backward when some devices have meta params
+        # because we are not instantiating a full Trainer here, which contains the logic
+        # to move params off of meta device.
+        if init_device == 'cpu':
+            tokenized_input = tokenizer(
+                ['Hello world blah blah', 'Goodbye world'],
+                return_tensors='pt',
+                padding=True)
+            tokenized_input['labels'] = tokenized_input['input_ids'].clone()
 
-        tokenized_input = {k: v.cuda() for k, v in tokenized_input.items()}
-        model.to('cuda')
+            tokenized_input = {k: v.cuda() for k, v in tokenized_input.items()}
+            model.to('cuda')
 
-        with get_precision_context('amp_bf16'):
-            # We're just testing that flash attention 2 runs okay
-            outputs = model(tokenized_input)
-            loss = outputs.loss
-            loss.backward()
+            with get_precision_context('amp_bf16'):
+                # We're just testing that flash attention 2 runs okay
+                outputs = model(tokenized_input)
+                loss = outputs.loss
+                loss.backward()

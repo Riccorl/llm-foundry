@@ -112,8 +112,7 @@ class ConcatTokensDataset(IterableDataset):
             return self.multi_threaded_iter()
         else:
             return self.single_threaded_iter()
-        
-    
+
     def single_threaded_iter(self) -> Iterable[Dict[str, bytes]]:
         total_samples = 0
         buffer = []

@@ -6,11 +6,12 @@ export WANDB_MODE=offline
 # read Huggingface token from .env file
 # export HF_TOKEN=$(cat .envs | grep HF_TOKEN | cut -d '=' -f2)
 
-source ~/llmfoundry-cuda-flash-attn2-env/bin/activate
+source ~/llmfoundry-0.6.0/bin/activate
 
 # get parent folder in input
 FOLDER=$1
 HF_FOLDER=$2
+MODEL_NAME=$3
 
 # check if both inputs are provided
 if [ -z "$FOLDER" ] || [ -z "$HF_FOLDER" ]; then
@@ -25,14 +26,21 @@ if [ ! -d "$HF_FOLDER" ]; then
 fi
 
 # extract the model name from the folder
-MODEL_NAME=$(basename $FOLDER)
+if [ -z "$MODEL_NAME" ]; then
+    MODEL_NAME=$(basename $FOLDER)
+fi
 
 # upload latest
-# python scripts/inference/convert_composer_to_hf.py \
-#     --composer_path "$FOLDER"/latest-rank0.pt \
-#     --hf_output_path "$HF_FOLDER"/"$MODEL_NAME"-latest \
-#     --output_precision bf16 \
-#     --hf_repo_for_upload sapienzanlp/"$MODEL_NAME"
+# remove old "latest" folder if it exists
+if [ -d "$HF_FOLDER"/"$MODEL_NAME"-latest ]; then
+    echo "Removing old $HF_FOLDER/$MODEL_NAME-latest folder"
+    rm -r "$HF_FOLDER"/"$MODEL_NAME"-latest
+fi
+~/llmfoundry-0.6.0/bin/python scripts/inference/convert_composer_to_hf.py \
+    --composer_path "$FOLDER"/latest-rank0.pt \
+    --hf_output_path "$HF_FOLDER"/"$MODEL_NAME"-latest \
+    --output_precision bf16 \
+    --hf_repo_for_upload sapienzanlp/"$MODEL_NAME"
 
 # now itereate over all the checkpoints but the latest
 for FILE in "$FOLDER"/*; do
@@ -53,7 +61,7 @@ for FILE in "$FOLDER"/*; do
     fi
 
     # upload the checkpoint
-    python scripts/inference/convert_composer_to_hf.py \
+    ~/llmfoundry-0.6.0/bin/python scripts/inference/convert_composer_to_hf.py \
         --composer_path "$FILE" \
         --hf_output_path "$HF_FOLDER"/"$MODEL_NAME"-step"$STEP" \
         --output_precision bf16 \

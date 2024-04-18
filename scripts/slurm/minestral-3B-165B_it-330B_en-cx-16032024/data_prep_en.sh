@@ -16,11 +16,12 @@ module load openmpi/4.1.4--gcc--11.3.0-cuda-11.8 zlib/1.2.13--gcc--11.3.0 cuda/1
 # export OMP_PROC_BIND=true
 export HF_DATASETS_CACHE=$SCRATCH/hf_cache
 
-source ~/llmfoundry-cuda-flash-attn2-env/bin/activate
+# source ~/llmfoundry-cuda-flash-attn2-env/bin/activate
+source ~/llmfoundry-0.6.0/bin/activate
 
-~/llmfoundry-cuda-flash-attn2-env/bin/python scripts/data_prep/convert_dataset_hf.py \
+source ~/llmfoundry-0.6.0/bin/python scripts/data_prep/convert_dataset_hf.py \
     --dataset /leonardo/prod/data/ai/culturax/2309/en \
-    --out_root /leonardo_scratch/fast/IscrB_medit/training/minestral-3B-165B_it-330B_en-cx-16032024-2048/data/processed/en \
+    --out_root /leonardo_work/IscrB_medit/training/minestral-3B-165B_it-330B_en-cx-16032024-2048/data/processed/en \
     --split train --concat_tokens 2048 --tokenizer /leonardo_scratch/large/userexternal/rorland1/data/minestral-350m-7B_it-7B_en-cx-13022024/tokenizer/minestral-350m-7B_it-7B_en-cx-13022024-hf \
     --max_tokens 330_000_000_000 \
     --num_workers 32 \
