@@ -1,11 +1,8 @@
-# custom
-.envs
-
 # Data (created in readme examples)
 my-copy-c4*/
 my-copy-arxiv*/
 *.jsonl*
-logs/*
+logs
 
 # WandB
 wandb/
@@ -159,3 +156,4 @@ notebooks/
 **/*.pt
 **/mlruns/*
 **/tokenizer-save-dir-*/**
+**/.downloaded_finetuning/
