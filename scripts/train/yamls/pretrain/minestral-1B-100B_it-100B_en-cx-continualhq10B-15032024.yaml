@@ -11,7 +11,7 @@ run_name: minestral-1B-100B_it-100B_en-cx-continualhq10B-noreset-15042024 # If l
 
 # Model
 model:
-  use_auth_token: ${oc.env:HF_TOKEN} # ${oc.env:HF_TOKEN}
+  use_auth_token: ${oc.env:HF_TOKEN} # ${oc.env:HF_TOKEN} # ${oc.env:HF_TOKEN}
   name: hf_causal_lm
   pretrained_model_name_or_path: mistralai/Mistral-7B-v0.1
   use_flash_attention_2: True
@@ -144,8 +144,8 @@ seed: ${global_seed}
 device_eval_batch_size: 16
 # device_train_microbatch_size: 8
 device_train_microbatch_size: auto
-precision: amp_bf16
-# precision: fp32 # for debugging in cpu
+# precision: amp_bf16
+precision: fp32 # for debugging in cpu
 
 # load_ignore_keys:
 #   - schedulers

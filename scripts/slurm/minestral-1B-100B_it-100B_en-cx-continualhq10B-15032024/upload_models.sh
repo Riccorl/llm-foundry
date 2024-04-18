@@ -26,5 +26,5 @@ export WANDB_MODE=offline
 export HF_TOKEN=$(cat .envs | grep HF_TOKEN | cut -d '=' -f2)
 
 bash scripts/inference/upload_checkpoints_hf_hub.sh \
-    /leonardo_scratch/large/userexternal/rorland1/llm-foundry/runs/minestral-1B-100B_it-100B_en-cx-continualhq10B-noreset-15042024 \
+    /leonardo_scratch/large/userexternal/rorland1/llm-foundry/runs/minestral-1B-100B_it-100B_en-cx-continualhq10B-15042024 \
     /leonardo_scratch/large/userexternal/rorland1/checkpoints/
