@@ -27,4 +27,5 @@ export HF_TOKEN=$(cat .envs | grep HF_TOKEN | cut -d '=' -f2)
 
 bash scripts/inference/upload_checkpoints_hf_hub.sh \
     /leonardo_scratch/large/userexternal/rorland1/llm-foundry/runs/minestral-350M-35B_it-35B_en-cx-17032024 \
-    /leonardo_scratch/large/userexternal/rorland1/checkpoints/
+    /leonardo_scratch/large/userexternal/rorland1/checkpoints/ \
+    Minerva-350M
