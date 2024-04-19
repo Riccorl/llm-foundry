@@ -141,8 +141,8 @@ fi
 module load $MODULES
 source "$PYTHON_ENV"
 
-# cd to the directory where this script is located
-CURRENT_DIR="$(dirname "$0")"
+# get the absolute path of the current directory
+CURRENT_DIR="$(cd "$(dirname "$0")" && pwd)"
 export CURRENT_DIR
 cd $CURRENT_DIR
 
