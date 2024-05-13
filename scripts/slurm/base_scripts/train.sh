@@ -1,6 +1,6 @@
 #!/bin/bash
 
-USAGE="Usage: $0 [OPTIONS]
+USAGE="Usage: train.sh [OPTIONS]
 
 This script is used to train a model with various parameters.
 
@@ -20,13 +20,14 @@ Options:
   -x                Use exclusive node
   -t TRAINING_SCRIPT Path to the training script
   -g GPU_PER_NODE   Number of GPUs per node
+  -i INTERACTIVE    Run the job interactively
 
 Invalid options will show this help message and exit.
 "
 
 # check for named params
 #while [ $OPTIND -le "$#" ]; do
-while getopts ":hc:v:n:l:m:t:a:p:j:e:o:xt:g:" opt; do
+while getopts ":hc:v:n:l:m:t:a:p:j:e:o:xt:g:i" opt; do
     case $opt in
     h)
         printf "%s$USAGE" && exit 0
@@ -73,6 +74,9 @@ while getopts ":hc:v:n:l:m:t:a:p:j:e:o:xt:g:" opt; do
     g)
         GPU_PER_NODE="$OPTARG"
         ;;
+    i) 
+        INTERACTIVE="TRUE"
+        ;;
     \?)
         echo "Invalid option -$OPTARG" >&2 && echo "$USAGE" && exit 0
         ;;
@@ -84,7 +88,7 @@ if [ -z "$CONFIG_PATH" ]; then
 fi
 
 if [ -z "$PYTHON_ENV" ]; then
-    PYTHON_ENV=~/llmfoundry-0.6.0/bin/activate
+    PYTHON_ENV=/leonardo_scratch/large/userexternal/rorland1/python-envs/llm-foundry-0.8.0-venv/bin/activate
 fi
 
 if [ -z "$NODES" ]; then
@@ -138,6 +142,10 @@ if [ -z "$GPU_PER_NODE" ]; then
     GPU_PER_NODE=1
 fi
 
+if [ -z "$INTERACTIVE" ]; then
+    INTERACTIVE="FALSE"
+fi
+
 module load $MODULES
 source "$PYTHON_ENV"
 
@@ -148,7 +156,14 @@ cd $CURRENT_DIR
 
 if [ -z "$TRAINING_SCRIPT" ]; then
     # get training script from project folder
-    TRAINING_SCRIPT="$(pwd)/../../../train/train.py"
+    TRAINING_SCRIPT="$(pwd)/../../train/train.py"
+fi
+
+# check whether the configuration file is a relative path
+if [[ ${CONFIG_PATH:0:1} == '/' ]]; then
+    CONFIG_PATH=$CONFIG_PATH
+else
+    CONFIG_PATH="$(pwd)/../../train/yamls/pretrain/$CONFIG_PATH"
 fi
 
 # if NODES is 1, then we don't need all this shit'
@@ -176,34 +191,44 @@ export HF_TOKEN=$(python -c "import huggingface_hub; print(huggingface_hub.HfFol
 export TRAINING_SCRIPT
 export CONFIG_PATH
 
+# export params
+export PYTHON_ENV
+export INTERACTIVE
+
 # echo the params
 echo "CURRENT_DIR: $CURRENT_DIR"
 echo "CONFIG_PATH: $CONFIG_PATH"
 echo "PYTHON_ENV: $PYTHON_ENV"
-echo "NODES: $NODES"
-echo "GPU_PER_NODE: $GPU_PER_NODE"
-echo "LOGS_PATH: $LOGS_PATH"
-echo "MODULES: $MODULES"
-echo "TIME: $TIME"
-echo "ACCOUNT: $ACCOUNT"
-echo "PARTITION: $PARTITION"
-echo "JOB_NAME: $JOB_NAME"
-echo "STD_OUT: $STD_OUT"
-echo "STD_ERR: $STD_ERR"
-echo "EXCLUSIVE: $EXCLUSIVE"
 echo "TRAINING_SCRIPT: $TRAINING_SCRIPT"
 
 # srun ./scripts/slurm/minestral-3B-165B_it-330B_en-cx-16032024/train_multinode.sh
-sbatch -p $PARTITION \
-    -A $ACCOUNT \
-    --nodes=$NODES \
-    --ntasks=$NODES \
-    --time=$TIME \
-    --job-name=$JOB_NAME \
-    --output=$STD_OUT \
-    --error=$STD_ERR \
-    --ntasks-per-node=1 \
-    --cpus-per-task=8 \
-    --gres=gpu:$GPU_PER_NODE \
-    $EXCLUSIVE \
-    ./helpers/train.slurm
+if [ "$INTERACTIVE" = "TRUE" ]; then
+    echo "Running job interactively"
+    bash ./helpers/train.slurm
+else
+    echo "NODES: $NODES"
+    echo "GPU_PER_NODE: $GPU_PER_NODE"
+    echo "LOGS_PATH: $LOGS_PATH"
+    echo "MODULES: $MODULES"
+    echo "TIME: $TIME"
+    echo "ACCOUNT: $ACCOUNT"
+    echo "PARTITION: $PARTITION"
+    echo "JOB_NAME: $JOB_NAME"
+    echo "STD_OUT: $STD_OUT"
+    echo "STD_ERR: $STD_ERR"
+    echo "EXCLUSIVE: $EXCLUSIVE"
+    echo "Running job non-interactively"
+    sbatch -p $PARTITION \
+        -A $ACCOUNT \
+        --nodes=$NODES \
+        --ntasks=$NODES \
+        --time=$TIME \
+        --job-name=$JOB_NAME \
+        --output=$STD_OUT \
+        --error=$STD_ERR \
+        --ntasks-per-node=1 \
+        --cpus-per-task=8 \
+        --gres=gpu:$GPU_PER_NODE \
+        $EXCLUSIVE \
+        ./helpers/train.slurm
+fi

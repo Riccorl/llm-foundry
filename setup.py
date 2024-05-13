@@ -104,6 +104,7 @@ extra_deps['tensorboard'] = [
 
 # Flash 2 group kept for backwards compatibility
 extra_deps['gpu-flash2'] = [
+    'wheel', # need for flash-attn to not break (no module named packaging)
     'flash-attn==2.5.8',
 ]
 

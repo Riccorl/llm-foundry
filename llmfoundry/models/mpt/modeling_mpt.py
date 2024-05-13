@@ -30,7 +30,7 @@ from composer.utils import dist
 
 from llmfoundry.layers_registry import ffns_with_megablocks
 from llmfoundry.models.layers.attention import is_flash_v2_installed
-from llmfoundry.models.layers.norm import NORM_CLASS_REGISTRY
+# from llmfoundry.models.layers.norm import NORM_CLASS_REGISTRY
 
 if is_flash_v2_installed():
     try:  # This try...except is needed because transformers requires it despite the 'if' statement above

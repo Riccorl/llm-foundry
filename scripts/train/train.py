@@ -59,7 +59,7 @@ log = logging.getLogger(__name__)
 def validate_config(cfg: DictConfig):
     """Validates compatible model and dataloader selection."""
     loaders = [cfg.train_loader]
-    if "eval_loader" in cfg:
+    if 'eval_loader' in cfg:
         eval_loader = cfg.eval_loader
         if isinstance(eval_loader, ListConfig):
             for loader in eval_loader:
@@ -78,8 +78,8 @@ def validate_config(cfg: DictConfig):
                     f'Model type "{cfg.model.name}" is not supported when using the "text " ' +\
                     f'dataloader. Only finetuning is supported.')
 
-    if "icl_tasks" in cfg:
-        if cfg.model.name == "hf_t5":
+    if 'icl_tasks' in cfg:
+        if cfg.model.name == 'hf_t5':
             raise ValueError(
                 'ICL evaluation does not currently support Encoder-Decoder models, such as "hf_t5".',
             )
@@ -120,7 +120,7 @@ def validate_config(cfg: DictConfig):
         )
         torch._dynamo.config.suppress_errors = True  # type: ignore (third-party)
 
-    if cfg.model.get("load_in_8bit", False):
+    if cfg.model.get('load_in_8bit', False):
         raise ValueError(
             '`load_in_8bit` is only supported for evaluation rather than training.',
         )
@@ -174,19 +174,11 @@ def main(cfg: DictConfig) -> Trainer:
 
     # Filter deprecation warning from torch internal usage
     warnings.filterwarnings(
-        action="ignore",
+        action='ignore',
         category=UserWarning,
         message=
         'torch.distributed.*_base is a private function and will be deprecated.*',
     )
-
-    # Run user provided code if specified
-    code_paths = pop_config(
-        cfg, "code_paths", must_exist=False, default_value=[], convert=True
-    )
-    # Import any user provided code
-    for code_path in code_paths:
-        import_file(code_path)
 
     # Check for incompatibilities between the model and data loaders
     validate_config(cfg)
@@ -199,7 +191,7 @@ def main(cfg: DictConfig) -> Trainer:
 
     cuda_alloc_conf = []
     # Get max split size mb
-    max_split_size_mb: Optional[int] = cfg.pop("max_split_size_mb", None)
+    max_split_size_mb: Optional[int] = cfg.pop('max_split_size_mb', None)
     if max_split_size_mb is not None:
         cuda_alloc_conf.append(f'max_split_size_mb:{max_split_size_mb}')
 
@@ -212,12 +204,12 @@ def main(cfg: DictConfig) -> Trainer:
 
     # Set CUDA lazy loading
     # This can save a bit of memory if not all modules are needed
-    cuda_load_lazy: bool = cfg.pop("cuda_load_lazy", False)
+    cuda_load_lazy: bool = cfg.pop('cuda_load_lazy', False)
     if cuda_load_lazy:
-        os.environ["CUDA_MODULE_LOADING"] = "LAZY"
+        os.environ['CUDA_MODULE_LOADING'] = 'LAZY'
 
     # Set seed first
-    seed: int = pop_config(cfg, "seed", must_exist=True)
+    seed: int = pop_config(cfg, 'seed', must_exist=True)
     reproducibility.seed_all(seed)
 
     # Initialize pytorch distributed training process groups
@@ -388,7 +380,7 @@ def main(cfg: DictConfig) -> Trainer:
     )
     save_filename: str = pop_config(
         cfg,
-        "save_filename",
+        'save_filename',
         must_exist=False,
         default_value='ep{epoch}-ba{batch}-rank{rank}.pt',
     )
@@ -489,12 +481,10 @@ def main(cfg: DictConfig) -> Trainer:
 
     # Enable autoresume from model checkpoints if possible
     autoresume_default: bool = False
-    if (
-        logged_cfg.get("run_name", None) is not None
-        and save_folder is not None
-        and not save_overwrite
-        and not save_weights_only
-    ):
+    if logged_cfg.get('run_name', None) is not None \
+        and save_folder is not None \
+        and not save_overwrite \
+        and not save_weights_only:
         autoresume_default = True
 
     if cfg.get('autoresume') is None and autoresume_default:
@@ -512,12 +502,12 @@ def main(cfg: DictConfig) -> Trainer:
 
     # Pop known unused parameters that are used as interpolation variables or
     # created by update_batch_size_info.
-    pop_config(cfg, "data_local", must_exist=False)
-    pop_config(cfg, "data_remote", must_exist=False)
-    pop_config(cfg, "global_seed", must_exist=False)
-    pop_config(cfg, "global_train_batch_size", must_exist=False)
-    pop_config(cfg, "n_gpus", must_exist=False)
-    pop_config(cfg, "device_train_grad_accum", must_exist=False)
+    pop_config(cfg, 'data_local', must_exist=False)
+    pop_config(cfg, 'data_remote', must_exist=False)
+    pop_config(cfg, 'global_seed', must_exist=False)
+    pop_config(cfg, 'global_train_batch_size', must_exist=False)
+    pop_config(cfg, 'n_gpus', must_exist=False)
+    pop_config(cfg, 'device_train_grad_accum', must_exist=False)
 
     # Warn users for unused parameters
     for key in cfg:
@@ -534,7 +524,7 @@ def main(cfg: DictConfig) -> Trainer:
 
     # Initialize context
     init_context = process_init_device(model_config, fsdp_config)
-    logged_cfg.update({"fsdp_config": fsdp_config}, merge=True)
+    logged_cfg.update({'fsdp_config': fsdp_config}, merge=True)
 
     # Build tokenizer
     log.info('Building tokenizer...')
@@ -543,18 +533,14 @@ def main(cfg: DictConfig) -> Trainer:
     tokenizer = build_tokenizer(tokenizer_name, tokenizer_kwargs)
 
     # Scheduler
-    scheduler_name: str = scheduler_config.pop("name")
+    scheduler_name: str = scheduler_config.pop('name')
     scheduler = build_scheduler(scheduler_name, scheduler_config)
 
     # Loggers
-    loggers = (
-        [
-            build_logger(str(name), logger_cfg)
-            for name, logger_cfg in logger_configs.items()
-        ]
-        if logger_configs
-        else []
-    )
+    loggers = [
+        build_logger(str(name), logger_cfg)
+        for name, logger_cfg in logger_configs.items()
+    ] if logger_configs else []
 
     mosaicml_logger = find_mosaicml_logger(loggers)
     if mosaicml_logger is None:
@@ -565,7 +551,7 @@ def main(cfg: DictConfig) -> Trainer:
 
     if metadata is not None:
         # Flatten the metadata for logging
-        logged_cfg.pop("metadata", None)
+        logged_cfg.pop('metadata', None)
         logged_cfg.update(metadata, merge=True)
         if mosaicml_logger is not None:
             mosaicml_logger.log_metrics(metadata)
@@ -619,14 +605,10 @@ def main(cfg: DictConfig) -> Trainer:
     use_async_eval = any(isinstance(c, AsyncEval) for c in callbacks)
 
     # Algorithms
-    algorithms = (
-        [
-            build_algorithm(str(name), algorithm_cfg)
-            for name, algorithm_cfg in algorithm_configs.items()
-        ]
-        if algorithm_configs
-        else None
-    )
+    algorithms = [
+        build_algorithm(str(name), algorithm_cfg)
+        for name, algorithm_cfg in algorithm_configs.items()
+    ] if algorithm_configs else None
 
     # Dataloaders
     log.info('Building train loader...')
@@ -642,7 +624,7 @@ def main(cfg: DictConfig) -> Trainer:
         raise e
 
     if mosaicml_logger is not None:
-        mosaicml_logger.log_metrics({"data_validated": time.time()})
+        mosaicml_logger.log_metrics({'data_validated': time.time()})
 
     ## Evaluation
     if use_async_eval:
@@ -710,7 +692,7 @@ def main(cfg: DictConfig) -> Trainer:
     })
 
     # Optimizer
-    optimizer_name: str = optimizer_config.pop("name")
+    optimizer_name: str = optimizer_config.pop('name')
     optimizer = build_optimizer(model, optimizer_name, optimizer_config)
 
     # Now add the eval metrics
@@ -752,7 +734,6 @@ def main(cfg: DictConfig) -> Trainer:
         algorithms=algorithms,
         device_train_microbatch_size=device_train_microbatch_size,
         fsdp_config=fsdp_config,
-        deepspeed_config=deepspeed_config,
         save_folder=save_folder,
         save_filename=save_filename,
         save_latest_filename=save_latest_filename,
@@ -789,11 +770,11 @@ def main(cfg: DictConfig) -> Trainer:
     return trainer
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     yaml_path, args_list = sys.argv[1], sys.argv[2:]
 
     # Disable resolving environment variables through omegaconf.
-    om.clear_resolver('oc.env')
+    # om.clear_resolver('oc.env')
 
     # Load yaml and cli arguments.
     with open(yaml_path) as f:
