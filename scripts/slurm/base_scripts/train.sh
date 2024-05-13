@@ -152,10 +152,10 @@ if [ -z "$TRAINING_SCRIPT" ]; then
 fi
 
 # if NODES is 1, then we don't need all this shit'
-# check if NODES = 1
-
+export NODES
+export GPU_PER_NODE
 if [ $NODES -gt 1 ]; then
-    export NPROCS=4 # number of GPUs per node
+    export NPROCS=$GPU_PER_NODE # number of GPUs per node
     export MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
     export MASTER_PORT=11111
     export WORLD_SIZE=$(($SLURM_NNODES * $NPROCS))    
@@ -206,4 +206,4 @@ sbatch -p $PARTITION \
     --cpus-per-task=8 \
     --gres=gpu:$GPU_PER_NODE \
     $EXCLUSIVE \
-    ./train.slurm
+    ./helpers/train.slurm

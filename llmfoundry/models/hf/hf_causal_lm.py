@@ -374,6 +374,25 @@ class ComposerHFCausalLM(HuggingFaceModelWithZLoss):
             peft_config=peft_config,
         )
 
+        self.n_active_params = sum(p.numel() for p in self.parameters())
+
+    def flops_per_batch(self, batch: Mapping) -> int:
+        # Note: this computation does not take into account padding, and assumes
+        # that the dataset has been constructed without padding. Additionally, we
+        # assume the backward pass is approximately 2x the forward pass
+
+        bs, msl = batch['input_ids'].shape[0:2]
+        params = self.n_active_params
+        if not self.model.model.config.tie_word_embeddings:
+            # embedding layers are lookup tables, therefore are not counted in the FLOP computation
+            params -= self.model.model.embed_tokens.weight.numel()
+        params_flops_per_token = 2 * params
+        params_flops_per_seq = params_flops_per_token * msl
+        attn_flops_per_seq = (self.model.config.num_hidden_layers * 2 * 2 *
+                              (self.model.config.hidden_size * (msl**2)))
+
+        return (params_flops_per_seq + attn_flops_per_seq) * 3 * bs
+
     @staticmethod
     def _patch_attention_type(model: PreTrainedModel,
                               attention_patch_type: str) -> None:

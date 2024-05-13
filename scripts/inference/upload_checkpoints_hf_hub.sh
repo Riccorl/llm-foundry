@@ -30,13 +30,16 @@ if [ -z "$MODEL_NAME" ]; then
     MODEL_NAME=$(basename $FOLDER)
 fi
 
+CURRENT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# SCRIPT_DIR=$CURRENT_DIR/../../inference
+
 # upload latest
 # remove old "latest" folder if it exists
 if [ -d "$HF_FOLDER"/"$MODEL_NAME"-latest ]; then
     echo "Removing old $HF_FOLDER/$MODEL_NAME-latest folder"
     rm -r "$HF_FOLDER"/"$MODEL_NAME"-latest
 fi
-~/llmfoundry-0.6.0/bin/python scripts/inference/convert_composer_to_hf.py \
+python $CURRENT_DIR/convert_composer_to_hf.py \
     --composer_path "$FOLDER"/latest-rank0.pt \
     --hf_output_path "$HF_FOLDER"/"$MODEL_NAME"-latest \
     --output_precision bf16 \
@@ -61,7 +64,7 @@ for FILE in "$FOLDER"/*; do
     fi
 
     # upload the checkpoint
-    ~/llmfoundry-0.6.0/bin/python scripts/inference/convert_composer_to_hf.py \
+    python $CURRENT_DIR/convert_composer_to_hf.py \
         --composer_path "$FILE" \
         --hf_output_path "$HF_FOLDER"/"$MODEL_NAME"-step"$STEP" \
         --output_precision bf16 \

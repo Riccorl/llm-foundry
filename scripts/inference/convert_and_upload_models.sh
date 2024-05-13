@@ -43,8 +43,9 @@ module load $MODULES
 source "$PYTHON_ENV"
 
 # cd to the directory where this script is located
-CURRENT_DIR="$(dirname "$0")"
-INFERENCE_DIR="$(cd $CURRENT_DIR && cd ../../.. && pwd)"
+CURRENT_DIR="$(cd "$(dirname "$0")" && pwd)"
+echo "CURRENT_DIR: $CURRENT_DIR"
+INFERENCE_DIR=$CURRENT_DIR/../../inference
 cd $INFERENCE_DIR
 
 export HF_DATASETS_CACHE=$SCRATCH/hf_cache

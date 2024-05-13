@@ -207,6 +207,16 @@ def _convert_composer_to_hf(args: Namespace) -> None:
             local_folder_path, config=config, torch_dtype=dtype
         )
     else:
+        # print(f"Config: {config}")
+        # print(config._attn_implementation)
+        if config._attn_implementation != "eager":
+            config._attn_implementation = "eager"
+        if "attn_implementation" in config.__dict__:
+            del config.attn_implementation
+            print("Removed attn_implementation from config")
+        if "use_flash_attention_2" in config.__dict__:
+            del config.use_flash_attention_2
+            print("Removed use_flash_attention_2 from config")
         loaded_hf_model = transformers.AutoModelForCausalLM.from_pretrained(
             local_folder_path, config=config, torch_dtype=dtype
         )
