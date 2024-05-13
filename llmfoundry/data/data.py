@@ -13,6 +13,11 @@ from torch.utils.data import IterableDataset
 from tqdm import tqdm
 from transformers import PreTrainedTokenizerBase
 
+__all__ = [
+    'ConcatTokensDataset',
+    'NoConcatDataset',
+]
+
 
 class NoConcatDataset(IterableDataset):
     """An IterableDataset that returns text samples for MDSWriter.
@@ -21,7 +26,8 @@ class NoConcatDataset(IterableDataset):
     """
 
     def __init__(
-        self, hf_dataset: Union[hf_datasets.IterableDataset, hf_datasets.Dataset]
+        self,
+        hf_dataset: Union[hf_datasets.IterableDataset, hf_datasets.Dataset],
     ):
         self.hf_dataset = hf_dataset
 
@@ -76,35 +82,42 @@ class ConcatTokensDataset(IterableDataset):
         self.multi_process = multi_process
 
         self.bos_tokens = self.tokenizer(
-            self.bos_text, truncation=False, padding=False, add_special_tokens=False
-        )["input_ids"]
+            self.bos_text,
+            truncation=False,
+            padding=False,
+            add_special_tokens=False,
+        )['input_ids']
         if len(self.bos_tokens) > 1:
             warnings.warn(
-                f"You specified --concat_tokens with --bos_text, but your BOS text is not tokenizing to one token\
-                , instead we got {self.bos_tokens}. Quit if this was in error."
+                f'You specified --concat_tokens with --bos_text, but your BOS text is not tokenizing to one token\
+                , instead we got {self.bos_tokens}. Quit if this was in error.',
             )
 
         self.eos_tokens = self.tokenizer(
-            self.eos_text, truncation=False, padding=False, add_special_tokens=False
-        )["input_ids"]
+            self.eos_text,
+            truncation=False,
+            padding=False,
+            add_special_tokens=False,
+        )['input_ids']
         if len(self.eos_tokens) > 1:
             warnings.warn(
-                f"You specified --concat_tokens with --eos_text, but your EOS text is not tokenizing to one token\
-                , instead we got {self.eos_tokens}. Quit if this was in error."
+                f'You specified --concat_tokens with --eos_text, but your EOS text is not tokenizing to one token\
+                , instead we got {self.eos_tokens}. Quit if this was in error.',
             )
 
-        eos_text_provided = self.eos_text != ""
-        bos_text_provided = self.bos_text != ""
-        test_text = self.tokenizer("")
-        if len(test_text["input_ids"]) > 0 and (eos_text_provided or bos_text_provided):
-            message = (
-                "both eos and bos"
-                if eos_text_provided and bos_text_provided
-                else ("eos_text" if eos_text_provided else "bos_text")
+        eos_text_provided = self.eos_text != ''
+        bos_text_provided = self.bos_text != ''
+        test_text = self.tokenizer('')
+        if len(
+            test_text['input_ids'],
+        ) > 0 and (eos_text_provided or bos_text_provided):
+            message = 'both eos and bos' if eos_text_provided and bos_text_provided else (
+                'eos_text' if eos_text_provided else 'bos_text'
             )
             warnings.warn(
-                f"The provided tokenizer adds special tokens, but you also specified {message}. This may result "
-                + "in duplicated special tokens. Please be sure this is what you intend."
+                f'The provided tokenizer adds special tokens, but you also specified {message}. This may result '
+                +
+                'in duplicated special tokens. Please be sure this is what you intend.',
             )
 
     def __iter__(self) -> Iterable[Dict[str, bytes]]:

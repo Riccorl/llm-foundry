@@ -28,7 +28,7 @@ def write_huggingface_pretrained_from_composer_checkpoint(
     checkpoint_path: Union[Path, str],
     output_path: Union[Path, str],
     trust_remote_code: bool,
-    output_precision: str = "fp32",
+    output_precision: str = 'fp32',
     local_checkpoint_save_location: Optional[Union[Path, str]] = None,
 ) -> Tuple[PretrainedConfig, Optional[PreTrainedTokenizerBase]]:
     """Convert a Composer checkpoint to a pretrained HF checkpoint folder.
@@ -83,16 +83,16 @@ def write_huggingface_pretrained_from_composer_checkpoint(
     # default local path to a tempfile if path is not provided
     if local_checkpoint_save_location is None:
         tmp_dir = tempfile.TemporaryDirectory()
-        local_checkpoint_save_location = (
-            Path(tmp_dir.name) / "local-composer-checkpoint.pt"
-        )
+        local_checkpoint_save_location = Path(
+            tmp_dir.name,
+        ) / 'local-composer-checkpoint.pt'
 
     # create folder
     os.makedirs(output_path)
 
     # download the checkpoint file
     print(
-        f"Downloading checkpoint from {checkpoint_path} -> {local_checkpoint_save_location}"
+        f'Downloading checkpoint from {checkpoint_path} -> {local_checkpoint_save_location}',
     )
     get_file(str(checkpoint_path), str(local_checkpoint_save_location))
 
@@ -102,7 +102,7 @@ def write_huggingface_pretrained_from_composer_checkpoint(
 
     if "state" not in composer_state_dict:
         raise RuntimeError(
-            f'"state" is not an available key in the provided composer checkpoint. Is {local_checkpoint_save_location} ill-formed?'
+            f'"state" is not an available key in the provided composer checkpoint. Is {local_checkpoint_save_location} ill-formed?',
         )
 
     # Build and save HF Config
@@ -121,7 +121,8 @@ def write_huggingface_pretrained_from_composer_checkpoint(
     print("#" * 30)
     print("Saving HF Tokenizer...")
     hf_tokenizer = get_hf_tokenizer_from_composer_state_dict(
-        composer_state_dict, trust_remote_code
+        composer_state_dict,
+        trust_remote_code,
     )
     if hf_tokenizer is not None:
         hf_tokenizer.save_pretrained(output_path)
@@ -136,7 +137,8 @@ def write_huggingface_pretrained_from_composer_checkpoint(
     if "state" in weights_state_dict:
         weights_state_dict = weights_state_dict["state"]["model"]
     torch.nn.modules.utils.consume_prefix_in_state_dict_if_present(
-        weights_state_dict, prefix="model."
+        weights_state_dict,
+        prefix='model.',
     )
 
     # Convert weights to desired dtype
@@ -156,21 +158,28 @@ def write_huggingface_pretrained_from_composer_checkpoint(
 def parse_args() -> Namespace:
     """Parse commandline arguments."""
     parser = ArgumentParser(
-        description="Convert a HuggingFace causal LM in a Composer checkpoint into a standard HuggingFace checkpoint folder, and optionally upload to the hub."
+        description=
+        'Convert a HuggingFace causal LM in a Composer checkpoint into a standard HuggingFace checkpoint folder, and optionally upload to the hub.',
     )
-    parser.add_argument("--composer_path", type=str, required=True)
-    parser.add_argument("--hf_output_path", type=str, required=True)
-    parser.add_argument("--local_checkpoint_save_location", type=str, default=None)
+    parser.add_argument('--composer_path', type=str, required=True)
+    parser.add_argument('--hf_output_path', type=str, required=True)
     parser.add_argument(
-        "--output_precision", type=str, choices=["fp32", "fp16", "bf16"], default="fp32"
+        '--local_checkpoint_save_location',
+        type=str,
+        default=None,
     )
-    parser.add_argument("--hf_repo_for_upload", type=str, default=None)
-    parser.add_argument("--revision", type=str, default=None)
-    parser.add_argument("--test_uploaded_model", action="store_true")
     parser.add_argument(
-        "--trust_remote_code",
-        action="store_true",
-        help="Whether or not to use code outside of transformers module.",
+        '--output_precision',
+        type=str,
+        choices=['fp32', 'fp16', 'bf16'],
+        default='fp32',
+    )
+    parser.add_argument('--hf_repo_for_upload', type=str, default=None)
+    parser.add_argument('--test_uploaded_model', action='store_true')
+    parser.add_argument(
+        '--trust_remote_code',
+        action='store_true',
+        help='Whether or not to use code outside of transformers module.',
     )
 
     return parser.parse_args()
@@ -202,9 +211,11 @@ def _convert_composer_to_hf(args: Namespace) -> None:
         # config.attn_config["attn_impl"] = "torch"
         config.init_device = "cpu"
 
-    if config.model_type == "mpt":
+    if config.model_type == 'mpt':
         loaded_hf_model = MPTForCausalLM.from_pretrained(
-            local_folder_path, config=config, torch_dtype=dtype
+            local_folder_path,
+            config=config,
+            torch_dtype=dtype,
         )
     else:
         # print(f"Config: {config}")
@@ -218,7 +229,9 @@ def _convert_composer_to_hf(args: Namespace) -> None:
             del config.use_flash_attention_2
             print("Removed use_flash_attention_2 from config")
         loaded_hf_model = transformers.AutoModelForCausalLM.from_pretrained(
-            local_folder_path, config=config, torch_dtype=dtype
+            local_folder_path,
+            config=config,
+            torch_dtype=dtype,
         )
 
     delattr(loaded_hf_model.config, "_name_or_path")
@@ -228,7 +241,8 @@ def _convert_composer_to_hf(args: Namespace) -> None:
     print(f"Loading tokenizer from {local_folder_path}")
 
     tokenizer = load_tokenizer(
-        local_folder_path, trust_remote_code=args.trust_remote_code
+        local_folder_path,
+        trust_remote_code=args.trust_remote_code,
     )
     tokenizer.save_pretrained(local_folder_path)
 
@@ -241,7 +255,7 @@ def _convert_composer_to_hf(args: Namespace) -> None:
 
     if object_store is not None:
         print(
-            f"Uploading HF checkpoint folder from {local_folder_path} -> {args.hf_output_path}"
+            f'Uploading HF checkpoint folder from {local_folder_path} -> {args.hf_output_path}',
         )
         for file in os.listdir(local_folder_path):
             remote_file = os.path.join(local_folder_path, file)
@@ -254,36 +268,33 @@ def _convert_composer_to_hf(args: Namespace) -> None:
         api = HfApi()
 
         print(
-            f"Uploading {args.hf_output_path} to HuggingFace Hub at {args.hf_repo_for_upload}"
+            f'Uploading {args.hf_output_path} to HuggingFace Hub at {args.hf_repo_for_upload}',
         )
         api.create_repo(
             repo_id=args.hf_repo_for_upload,
             use_auth_token=True,
-            repo_type="model",
+            repo_type='model',
             private=True,
             exist_ok=True,
         )
-        print("Repo created.")
+        print('Repo created.')
 
         # ignore the full checkpoint file if we now have sharded checkpoint files
         ignore_patterns = []
         if any(
-            f.startswith("pytorch_model-00001") for f in os.listdir(args.hf_output_path)
+            f.startswith('pytorch_model-00001')
+            for f in os.listdir(args.hf_output_path)
         ):
-            ignore_patterns.append("pytorch_model.bin")
+            ignore_patterns.append('pytorch_model.bin')
 
-        if args.revision is not None:
-            api.create_branch(args.hf_repo_for_upload, repo_type="model", branch=args.revision)
-        
         api.upload_folder(
             folder_path=args.hf_output_path,
             repo_id=args.hf_repo_for_upload,
             use_auth_token=True,
-            repo_type="model",
+            repo_type='model',
             ignore_patterns=ignore_patterns,
-            revision=args.revision,
         )
-        print("Folder uploaded.")
+        print('Folder uploaded.')
 
         if args.test_uploaded_model:
             print("Testing uploaded model...")
@@ -292,36 +303,37 @@ def _convert_composer_to_hf(args: Namespace) -> None:
                 trust_remote_code=True,
                 use_auth_token=True,
                 torch_dtype=dtype,
-                revision=args.revision,
             )
             hub_tokenizer = transformers.AutoTokenizer.from_pretrained(
-                args.hf_repo_for_upload, trust_remote_code=True, use_auth_token=True
+                args.hf_repo_for_upload,
+                trust_remote_code=True,
+                use_auth_token=True,
             )
 
-            assert sum(p.numel() for p in hub_model.parameters()) == sum(
-                p.numel() for p in loaded_hf_model.parameters()
-            )
+            assert sum(p.numel() for p in hub_model.parameters()
+                      ) == sum(p.numel() for p in loaded_hf_model.parameters())
             assert all(
-                str(type(module1)).split(".")[-2:] == str(type(module2)).split(".")[-2:]
-                for module1, module2 in zip(
-                    hub_model.modules(), loaded_hf_model.modules()
-                )
+                str(type(module1)).split('.')[-2:] == str(
+                    type(module2),
+                ).split('.')[-2:] for module1, module2 in
+                zip(hub_model.modules(), loaded_hf_model.modules())
             )
 
-            assert (
-                next(hub_model.parameters()).dtype == dtype
-            ), f"Expected model dtype to be {dtype}, but got {next(hub_model.parameters()).dtype}"
+            assert next(
+                hub_model.parameters(),
+            ).dtype == dtype, f'Expected model dtype to be {dtype}, but got {next(hub_model.parameters()).dtype}'
             print(
                 hub_tokenizer.batch_decode(
                     hub_model.generate(
-                        hub_tokenizer("MosaicML is", return_tensors="pt").input_ids,
+                        hub_tokenizer('MosaicML is',
+                                      return_tensors='pt').input_ids,
                         max_new_tokens=10,
-                    )
-                )
+                    ),
+                ),
             )
 
     print(
-        "Composer checkpoint successfully converted to HuggingFace checkpoint format."
+        'Composer checkpoint successfully converted to HuggingFace checkpoint format.',
     )
 
 

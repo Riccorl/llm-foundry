@@ -7,7 +7,7 @@ import json
 import os
 import platform
 from argparse import ArgumentParser, Namespace
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, Iterable, Optional, Union
 
@@ -98,7 +98,7 @@ def parse_args() -> Namespace:
 class DataSplitConstants:
     hf_split: str
     folder_split: str
-    raw_samples: int
+    raw_samples: Optional[int]
     truncated_samples: Union[int, None]
 
 
@@ -106,10 +106,10 @@ class DataSplitConstants:
 class DatasetConstants:
     chars_per_sample: int
     chars_per_token: int
-    splits = {}
+    splits: Dict[str, DataSplitConstants] = field(default_factory=dict)
 
     def __iter__(self):
-        for _, v in self.splits.items():
+        for v in self.splits.values():
             yield v
 
 
@@ -415,7 +415,7 @@ def main(args: Namespace) -> None:
         dataset_constants = CONSTS.get(args.dataset, anyconstants)
     except KeyError:
         raise ValueError(
-            f'Constants for dataset "{args.dataset}" not found. Currently only "the_pile" and "c4" are supported.'
+            f'Constants for dataset "{args.dataset}" not found. Currently only "the_pile" and "c4" are supported.',
         )
 
     if args.concat_tokens is not None:

@@ -10,18 +10,22 @@ the future.
 import logging
 from typing import Any, Dict
 
-from composer.core import Callback, State
+from composer.core import State
 from composer.loggers import Logger
 from streaming import StreamingDataset
 from torch.utils.data import DataLoader
 
+from llmfoundry.interfaces import CallbackWithConfig
+from llmfoundry.utils.warnings import experimental_class
+
 log = logging.getLogger(__name__)
 
+__all__ = ['CurriculumLearning']
 
-class CurriculumLearning(Callback):
+
+@experimental_class('CurriculumLearning callback')
+class CurriculumLearning(CallbackWithConfig):
     """Starts an epoch with a different dataset when resuming from a checkpoint.
-
-    This callback is currently experimental. The API may change without warning in the future.
 
     Args:
         dataset_index (int): The index of the dataset currently being used.
@@ -29,13 +33,13 @@ class CurriculumLearning(Callback):
             being used.
     """
 
-    def __init__(self, dataset_index: int, current_dataset_config: Dict):
+    def __init__(self, train_config: Dict, dataset_index: int):
         self.dataset_index = dataset_index
         self.saved_dataset_index = 0
         self.all_dataset_configs = []
         self.current_dataset_state = {}
         # The current dataset config is resolved and passed in train.py
-        self.current_dataset_config = current_dataset_config
+        self.current_dataset_config = train_config['train_loader']
 
     def before_load(self, state: State, logger: Logger):
         del logger
@@ -47,13 +51,15 @@ class CurriculumLearning(Callback):
         if not isinstance(train_loader, DataLoader):
             raise ValueError(
                 f'CurriculumLearning callback can only be used with a train ',
-                f'dataloader of type DataLoader, but got {type(train_loader)}.')
+                f'dataloader of type DataLoader, but got {type(train_loader)}.',
+            )
         dataset = train_loader.dataset
         if not isinstance(dataset, StreamingDataset):
             raise ValueError(
                 f'CurriculumLearning callback only supports StreamingDataset ',
                 f'because it requires loading and saving dataset state. ',
-                f'Instead, got a dataset of type {type(dataset)}')
+                f'Instead, got a dataset of type {type(dataset)}',
+            )
         assert isinstance(dataset, StreamingDataset)
         # Save the current dataset state so we can restore it if needed.
         self.current_dataset_state = dataset.state_dict(  # type: ignore
@@ -68,10 +74,12 @@ class CurriculumLearning(Callback):
         train_loader = state._train_dataloader
         assert isinstance(
             train_loader,
-            DataLoader), 'CurriculumLearning callback requires a DataLoader.'
+            DataLoader,
+        ), 'CurriculumLearning callback requires a DataLoader.'
         dataset = train_loader.dataset
         assert isinstance(
-            dataset, StreamingDataset
+            dataset,
+            StreamingDataset,
         ), 'CurriculumLearning callback requires a StreamingDataset.'
         if self.saved_dataset_index < self.dataset_index:
             # Ignore the dataset state that was read in from the checkpoint, and
@@ -97,7 +105,7 @@ class CurriculumLearning(Callback):
     def state_dict(self):
         return {
             'dataset_index': self.dataset_index,
-            'all_dataset_configs': self.all_dataset_configs
+            'all_dataset_configs': self.all_dataset_configs,
         }
 
     def load_state_dict(self, state: Dict[str, Any]):

@@ -27,7 +27,8 @@ class ConcatMode(Enum):
 def parse_args() -> Namespace:
     """Parse commandline arguments."""
     parser = ArgumentParser(
-        description="Convert dataset into MDS format, optionally concatenating and tokenizing"
+        description=
+        'Convert dataset into MDS format, optionally concatenating and tokenizing',
     )
     parser.add_argument("--path", type=str, required=True)
     parser.add_argument("--out_root", type=str, required=True)
@@ -37,39 +38,27 @@ def parse_args() -> Namespace:
     group.add_argument(
         "--concat_tokens",
         type=int,
-        help="Convert text to tokens and concatenate up to this many tokens",
+        help='Convert text to tokens and concatenate up to this many tokens',
     )
-    parser.add_argument("--split", type=str, default="train")
-    parser.add_argument("--max_rows", type=int, default=None, required=False)
-    parser.add_argument("--start_row", type=int, default=None)
-    parser.add_argument("--tokenizer", type=str, required=False, default=None)
-    parser.add_argument("--bos_text", type=str, required=False, default=None)
-    parser.add_argument("--eos_text", type=str, required=False, default=None)
-    parser.add_argument("--no_wrap", default=False, action="store_true")
-    parser.add_argument("--max_tokens", type=int, default=None, required=False)
-    parser.add_argument("--data_files_pattern", type=str, default="*")
-    parser.add_argument("--data_files", type=str, default=None)
-    parser.add_argument("--write_batch_size", type=int, default=10_000)
-    parser.add_argument("--multi_process", default=False, action="store_true")
-    parser.add_argument("--shuffle", default=False, action="store_true")
+    parser.add_argument('--split', type=str, default='train')
 
     parsed = parser.parse_args()
 
-    if (
-        os.path.isdir(parsed.out_root)
-        and len(set(os.listdir(parsed.out_root)).intersection(set(parsed.split))) > 0
-    ):
+    if os.path.isdir(parsed.out_root) and len(
+        set(os.listdir(parsed.out_root)).intersection(set(parsed.split)),
+    ) > 0:
         raise ValueError(
-            f"--out_root={parsed.out_root} contains {os.listdir(parsed.out_root)} which cannot overlap with the requested splits {parsed.splits}."
+            f'--out_root={parsed.out_root} contains {os.listdir(parsed.out_root)} which cannot overlap with the requested splits {parsed.splits}.',
         )
 
     # Make sure we have needed concat options
     if (
-        parsed.concat_tokens is not None
-        and isinstance(parsed.concat_tokens, int)
-        and parsed.tokenizer is None
+        parsed.concat_tokens is not None and
+        isinstance(parsed.concat_tokens, int) and parsed.tokenizer is None
     ):
-        parser.error("When setting --concat_tokens, you must specify a --tokenizer")
+        parser.error(
+            'When setting --concat_tokens, you must specify a --tokenizer',
+        )
 
     # now that we have validated them, change BOS/EOS to strings
     if parsed.bos_text is None:
@@ -125,13 +114,10 @@ def build_hf_dataset(
     else:
         data_files = data_files.split(",")
 
-    print(f"Loading dataset from {data_files}")
     hf_dataset = hf_datasets.load_dataset(
-        "json",
+        'json',
         data_files=data_files,
         split=split,
-        cache_dir=False,
-        num_proc=psutil.cpu_count(logical=True),
     )
 
     if shuffle:
@@ -141,24 +127,21 @@ def build_hf_dataset(
         dataset = NoConcatDataset(hf_dataset)
     else:
         if not isinstance(tokenizer, PreTrainedTokenizerBase):
-            raise ValueError(f"{tokenizer=} must be of type PreTrainedTokenizerBase")
+            raise ValueError(
+                f'{tokenizer=} must be of type PreTrainedTokenizerBase',
+            )
         if max_length is None:
-            raise ValueError(f"max_length must be set.")
-        if bos_text + eos_text == "":
-            test_tokens = tokenizer("test")
-            if (
-                test_tokens["input_ids"][0] != tokenizer.bos_token_id
-                and test_tokens["input_ids"][-1] != tokenizer.eos_token_id
-            ):
-                tok_error_msg = "This tokenizer does not insert an EOS nor BOS token. "
-                tok_error_msg += (
-                    "Concatenating with this tokenizer will result in sequences being "
-                )
-                tok_error_msg += "attached without a separating token. Please use another tokenizer, "
-                tok_error_msg += (
-                    "such as facebook/opt-125m, or specify EOS/BOS text with e.g. "
-                )
-                tok_error_msg += "--bos_text=<|endoftext|>."
+            raise ValueError(f'max_length must be set.')
+        if bos_text + eos_text == '':
+            test_tokens = tokenizer('test')
+            if test_tokens['input_ids'][
+                0] != tokenizer.bos_token_id and test_tokens['input_ids'][
+                    -1] != tokenizer.eos_token_id:
+                tok_error_msg = 'This tokenizer does not insert an EOS nor BOS token. '
+                tok_error_msg += 'Concatenating with this tokenizer will result in sequences being '
+                tok_error_msg += 'attached without a separating token. Please use another tokenizer, '
+                tok_error_msg += 'such as facebook/opt-125m, or specify EOS/BOS text with e.g. '
+                tok_error_msg += '--bos_text=<|endoftext|>.'
                 raise ValueError(tok_error_msg)
         dataset = ConcatTokensDataset(
             hf_dataset=hf_dataset,
@@ -167,14 +150,13 @@ def build_hf_dataset(
             bos_text=bos_text,
             eos_text=eos_text,
             no_wrap=no_wrap,
-            multi_process=multi_process,
-            write_batch_size=write_batch_size,
         )
     return dataset
 
 
 def generate_samples(
-    loader: DataLoader, truncate_num_samples: Optional[int] = None
+    loader: DataLoader,
+    truncate_num_samples: Optional[int] = None,
 ) -> Iterable[Dict[str, bytes]]:
     """Generator over samples of a dataloader.
 
@@ -223,42 +205,28 @@ def main(args: Namespace) -> None:
     # Get samples
     dataset = build_hf_dataset(
         path=args.path,
-        split=split,
+        split=args.split,
         mode=mode,
         max_length=args.concat_tokens,
         bos_text=args.bos_text,
         eos_text=args.eos_text,
         no_wrap=args.no_wrap,
         tokenizer=tokenizer,
-        data_files_pattern=args.data_files_pattern,
-        data_files=args.data_files,
-        write_batch_size=args.write_batch_size,
-        multi_process=args.multi_process,
-        shuffle=args.shuffle,
     )
 
     # Write samples
     print(f"Converting {args.path} to MDS format...")
     print(
-        f"Note: the progress bar is based on the dataset length before tokenization, and may finish at a value before 100%."
+        f'Note that the progress bar is based on the dataset length before tokenization.',
     )
+    print(f'It will finish at a value below 100% if tokenizing')
     with MDSWriter(
-        columns=columns, out=os.path.join(args.out_root), compression=args.compression
+        columns=columns,
+        out=os.path.join(args.out_root),
+        compression=args.compression,
     ) as out:
-        # we also want to count the number of tokens for the progress bar
-        processed_tokens = 0
-        progress_bar = tqdm(total=args.max_tokens)
-        try:
-            for sample in dataset:
-                processed_tokens += sample["num_tokens"]
-                progress_bar.update(sample.pop("num_tokens"))
-                out.write(sample)
-                if args.max_tokens is not None and processed_tokens >= args.max_tokens:
-                    print("Stopping early due to --max_tokens")
-                    break
-        except Exception as e:
-            print(f"Exception: {e}")
-            print(f"Processed {processed_tokens} tokens")
+        for sample in tqdm(dataset):
+            out.write(sample)
 
         # elif args.max_tokens is not None:
 
