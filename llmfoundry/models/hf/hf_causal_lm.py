@@ -106,6 +106,9 @@ class ComposerHFCausalLM(HuggingFaceModelWithFSDP):
             peft_config=peft_config,
         )
 
+        # for computing FLOPS
+        self.n_active_params = sum(p.numel() for p in self.parameters())
+
     @staticmethod
     def build_metrics(
         om_model_config: DictConfig,
@@ -363,3 +366,31 @@ class ComposerHFCausalLM(HuggingFaceModelWithFSDP):
             raise ValueError(
                 'PEFT is not installed, but peft_config was passed. Please install LLM Foundry with the peft extra to use peft_config.',
             )
+
+    def flops_per_batch(self, batch: Mapping) -> int:
+        # Note: this computation does not take into account padding, and assumes
+        # that the dataset has been constructed without padding. Additionally, we
+        # assume the backward pass is approximately 2x the forward pass
+
+        bs, msl = batch["input_ids"].shape[0:2]
+        params = self.n_active_params
+        if not self.model.model.config.tie_word_embeddings:
+            # embedding layers are lookup tables, therefore are not counted in the FLOP computation
+            try:
+                params -= self.model.model.embed_tokens.weight.numel()
+            except AttributeError:
+                # If the model does not have an embed_tokens attribute, we cannot compute the number of parameters
+                # This is the case for models that do not have a token embedding layer
+                log.warning(
+                    "Model does not have an embed_tokens attribute. Cannot remove embedding layer parameters from FLOP computation.",
+                )
+        params_flops_per_token = 2 * params
+        params_flops_per_seq = params_flops_per_token * msl
+        attn_flops_per_seq = (
+            self.model.config.num_hidden_layers
+            * 2
+            * 2
+            * (self.model.config.hidden_size * (msl**2))
+        )
+
+        return (params_flops_per_seq + attn_flops_per_seq) * 3 * bs
