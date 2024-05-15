@@ -30,6 +30,8 @@ from llmfoundry.models.layers.attention import is_flash_v2_installed
 from llmfoundry.models.utils import init_empty_weights
 from llmfoundry.utils.config_utils import get_hf_config_value, pop_config
 
+from llmfoundry.models.hf.sapienzanlp_mistral import MistralSapienzaNLPCausalLM
+
 if TYPE_CHECKING:
     from peft import PeftConfig, PeftModel
 
@@ -265,6 +267,8 @@ class ComposerHFCausalLM(HuggingFaceModelWithFSDP):
         if dist.get_local_rank() != 0 and init_device == 'mixed':
             om_model_config.pretrained = False
 
+        hf_model_class = AutoModelForCausalLM
+        # hf_model_class = MistralSapienzaNLPCausalLM
         # If the HuggingFace model is coming from a local folder, Hugging Face copies the modules into the
         # transformers modules cache. On particular systems, this operation seems to cause contention between
         # the different processes. To avoid this contention, we first create the model (on meta device) on local rank
@@ -274,7 +278,7 @@ class ComposerHFCausalLM(HuggingFaceModelWithFSDP):
             with init_empty_weights(include_buffers=False):
                 with warnings.catch_warnings():
                     warnings.simplefilter('ignore', UserWarning)
-                    AutoModelForCausalLM.from_pretrained(
+                    hf_model_class.from_pretrained(
                         pretrained_model_name_or_path,
                         trust_remote_code=trust_remote_code,
                         use_auth_token=use_auth_token,
@@ -286,7 +290,7 @@ class ComposerHFCausalLM(HuggingFaceModelWithFSDP):
         # initialize the model on the correct device
         if resolved_init_device == 'cpu':
             if om_model_config.pretrained:
-                model = AutoModelForCausalLM.from_pretrained(
+                model = hf_model_class.from_pretrained(
                     pretrained_model_name_or_path,
                     trust_remote_code=trust_remote_code,
                     use_auth_token=use_auth_token,
@@ -294,7 +298,8 @@ class ComposerHFCausalLM(HuggingFaceModelWithFSDP):
                     config=config,
                 )
             else:
-                model = AutoModelForCausalLM.from_config(
+                # model = hf_model_class(config)
+                model = hf_model_class.from_config(
                     config,
                     trust_remote_code=trust_remote_code,
                 )
@@ -304,7 +309,8 @@ class ComposerHFCausalLM(HuggingFaceModelWithFSDP):
                     'Setting cfg.pretrained=True is not supported when init_device="meta".',
                 )
             with init_empty_weights(include_buffers=False):
-                model = AutoModelForCausalLM.from_config(
+                # model = hf_model_class(config)
+                model = hf_model_class.from_config(
                     config,
                     trust_remote_code=trust_remote_code,
                 )

@@ -195,6 +195,16 @@ export CONFIG_PATH
 export PYTHON_ENV
 export INTERACTIVE
 
+# debug nvidia
+# force crashing on nccl issues like hanging broadcast
+export NCCL_ASYNC_ERROR_HANDLING=1
+
+# singolo nodo, 4 gpu, con e senza
+# export NCCL_IB_SL=1
+# export UCX_IB_SL=1
+# export NVSHMEM_IB_SL=1
+# export NVSHMEM_DISABLE_NCCL=1
+
 # echo the params
 echo "CURRENT_DIR: $CURRENT_DIR"
 echo "CONFIG_PATH: $CONFIG_PATH"

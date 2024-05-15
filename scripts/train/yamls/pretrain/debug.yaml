@@ -30,7 +30,7 @@ model:
 tokenizer:
   name: /leonardo_scratch/large/userexternal/rorland1/data/minestral-350m-7B_it-7B_en-cx-13022024/tokenizer/minestral-350m-7B_it-7B_en-cx-13022024-hf
   kwargs:
-    model_max_length: ${max_seq_len}
+    model_max_length: 1000000000000000019884624838656 # infinitymodel_max_length: ${max_seq_len}
 
 # Dataloaders
 train_loader:
@@ -99,24 +99,24 @@ max_duration: 47684ba #  global_train_batch_size: 2048
 eval_interval: 0
 eval_first: false
 eval_subset_num_batches: -1
-global_train_batch_size: 2048
+global_train_batch_size: 64
 
 # System
 seed: ${global_seed}
 device_eval_batch_size: 16
-device_train_microbatch_size: 8
+device_train_microbatch_size: 2
 # device_train_microbatch_size: auto
-precision: amp_bf16
-# precision: fp32 # for debugging in cpu
+# precision: amp_bf16
+precision: fp32 # for debugging in cpu
 
 # FSDP
-fsdp_config:
-  sharding_strategy: FULL_SHARD
-  mixed_precision: PURE
-  activation_checkpointing: False
-  activation_checkpointing_reentrant: false
-  activation_cpu_offload: false
-  limit_all_gathers: true
+# fsdp_config:
+#   sharding_strategy: FULL_SHARD
+#   mixed_precision: PURE
+#   activation_checkpointing: False
+#   activation_checkpointing_reentrant: false
+#   activation_cpu_offload: false
+#   limit_all_gathers: true
 
 # DeepSpeed
 # deepspeed_config:
