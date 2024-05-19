@@ -10,10 +10,9 @@ echo "BASE RANK: $BASE_RANK"
 echo "MASTER addr: $MASTER_ADDR"
 echo "MASTER port: $MASTER_PORT"
 echo "Training script: $TRAINING_SCRIPT"
-echo "Config file: $CONFIG_FILE"
+echo "Config file: $CONFIG_PATH"
 
-TRAINING_COMMAND="composer -v --world_size $WORLD_SIZE --BASE_RANK $BASE_RANK -n $NPROCS --master_addr $MASTER_ADDR --master_port \
-    $MASTER_PORT --node_rank $SLURM_NODEID $TRAINING_SCRIPT $CONFIG_FILE"
+TRAINING_COMMAND="composer -v --world_size $WORLD_SIZE --base_rank $BASE_RANK -n $NPROCS --master_addr $MASTER_ADDR --master_port $MASTER_PORT --node_rank $SLURM_NODEID $TRAINING_SCRIPT $CONFIG_PATH"
 
 echo "COMMAND: $TRAINING_COMMAND"
 echo "-----------------------------------"

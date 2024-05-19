@@ -13,6 +13,7 @@ Options:
   --max-tokens MAX_TOKENS   Maximum number of tokens to preprocess
   --batch-size BATCH_SIZE   Batch size of the dataloader for preprocessing
   --split SPLIT             Split of the dataset
+  --data-type DATA_TYPE     Type of the dataset
   -c --cpu CPUS_PER_TASK    Number of CPUs per task
   -s --shuffle SHUFFLE      Shuffle the dataset
   -v PYTHON_ENV             Python environment to use
@@ -32,8 +33,8 @@ Invalid options will show this help message and exit.
 
 # Transform long options to short ones
 for arg in "$@"; do
-  shift
-  case "$arg" in
+    shift
+    case "$arg" in
     '--help') set -- "$@" '-h' ;;
     '--input') set -- "$@" '-u' ;;
     '--output') set -- "$@" '-d' ;;
@@ -42,6 +43,7 @@ for arg in "$@"; do
     '--max-tokens') set -- "$@" '-q' ;;
     '--batch-size') set -- "$@" '-b' ;;
     '--split') set -- "$@" '-w' ;;
+    '--data-type') set -- "$@" '-z' ;;
     '--cpu') set -- "$@" '-c' ;;
     '--shuffle') set -- "$@" '-s' ;;
     '--log') set -- "$@" '-l' ;;
@@ -54,13 +56,13 @@ for arg in "$@"; do
     '--std-err') set -- "$@" '-e' ;;
     '--exclusive') set -- "$@" '-x' ;;
     '--interactive') set -- "$@" '-i' ;;
-  *) set -- "$@" "$arg" ;;
-  esac
+    *) set -- "$@" "$arg" ;;
+    esac
 done
 
 # check for named params
 #while [ $OPTIND -le "$#" ]; do
-while getopts ":hc:v:l:m:t:a:p:j:e:o:xis" opt; do
+while getopts ":hu:d:y:r:q:b:w:c:sv:l:m:t:a:p:j:o:e:xiz:" opt; do
     case $opt in
     h)
         printf "%s$USAGE" && exit 0
@@ -89,7 +91,7 @@ while getopts ":hc:v:l:m:t:a:p:j:e:o:xis" opt; do
     c)
         CPUS_PER_TASK="$OPTARG"
         ;;
-    s) 
+    s)
         SHUFFLE=""
         ;;
     v)
@@ -122,8 +124,11 @@ while getopts ":hc:v:l:m:t:a:p:j:e:o:xis" opt; do
     x)
         EXCLUSIVE="TRUE"
         ;;
-    i) 
+    i)
         INTERACTIVE="TRUE"
+        ;;
+    z)
+        DATA_TYPE="$OPTARG"
         ;;
     \?)
         echo "Invalid option -$OPTARG" >&2 && echo "$USAGE" && exit 0
@@ -133,28 +138,33 @@ done
 
 if [ -z "$INPUT" ]; then
     # raise an error if INPUT is not set
-    echo "Input dataset is not set. To set it, use the `--input` flag" && exit 1
+    echo "Input dataset is not set. To set it, use the $(--input) flag" && exit 1
 fi
 
 if [ -z "$OUTPUT" ]; then
     # raise an error if OUTPUT is not set
-    echo "Output dataset is not set. To set it, use the `--output` flag" && exit 1
+    echo "Output dataset is not set. To set it, use the $(--output) flag" && exit 1
 fi
 
 if [ -z "$TOKENIZER" ]; then
     # raise an error if TOKENIZER is not set
-    echo "Tokenizer is not set. To set it, use the `--tokenizer` flag" && exit 1
+    echo "Tokenizer is not set. To set it, use the $(--tokenizer) flag" && exit 1
 fi
 
 if [ -z "$SEQ_LEN" ]; then
     # raise an error if SEQ_LEN is not set
-    echo "Sequence length is not set. To set it, use the `--sequence-length` flag" && exit 1
+    echo "Sequence length is not set. To set it, use the $(--sequence-length) flag" && exit 1
+fi
+
+if [ -z "$DATA_TYPE" ]; then
+    # raise an error if DATA_TYPE is not set
+    echo "Data type is not set. To set it, use the $(--data-type) flag" && exit 1
 fi
 
 if [ -z "$MAX_TOKENS" ]; then
     MAX_TOKENS=""
 else
-    MAX_TOKENS="--max-tokens $MAX_TOKENS"
+    MAX_TOKENS="--max_tokens $MAX_TOKENS"
 fi
 
 if [ -z "$BATCH_SIZE" ]; then
@@ -177,15 +187,6 @@ if [ -z "$PYTHON_ENV" ]; then
     PYTHON_ENV=/leonardo_scratch/large/userexternal/rorland1/python-envs/llm-foundry-0.8.0-venv/bin/activate
 fi
 
-if [ -z "$LOGS_PATH" ]; then
-    # default logs path is in SCRATCH folder
-    LOGS_PATH="$SCRATCH/llm-foundry/training_logs"
-    # if logs path does not exist, create it
-    if [ ! -d "$LOGS_PATH" ]; then
-        mkdir -p "$LOGS_PATH"
-    fi
-fi
-
 if [ -z "$MODULES" ]; then
     MODULES="profile/deeplrn cuda/12.1"
 fi
@@ -203,15 +204,31 @@ if [ -z "$PARTITION" ]; then
 fi
 
 if [ -z "$JOB_NAME" ]; then
-    echo "JOB_NAME is not set. To set it, use the -j flag" && exit 1
+    # it not interactive, raise an error
+    if [ "$INTERACTIVE" = "FALSE" ]; then
+        echo "JOB_NAME is not set. To set it, use the -j flag" && exit 1
+    fi
+fi
+
+if [ -z "$LOGS_PATH" ]; then
+    # default logs path is in SCRATCH folder
+    LOGS_PATH="$SCRATCH/llm-foundry/training_logs"
+    # if logs path does not exist, create it
+    if [ ! -d "$LOGS_PATH/$JOB_NAME" ]; then
+        mkdir -p "$LOGS_PATH/$JOB_NAME"
+    fi
 fi
 
 if [ -z "$STD_OUT" ]; then
-    STD_OUT="$LOGS_PATH/$JOB_NAME.out"
+    # extract the last part of the JOB_NAME if it is a file path
+    JOB_NAME_FILE_NAME=$(basename $JOB_NAME)
+    STD_OUT="$LOGS_PATH/$JOB_NAME/$JOB_NAME_FILE_NAME.out"
 fi
 
 if [ -z "$STD_ERR" ]; then
-    STD_ERR="$LOGS_PATH/$JOB_NAME.err"
+    # extract the last part of the JOB_NAME if it is a file path
+    JOB_NAME_FILE_NAME=$(basename $JOB_NAME)
+    STD_ERR="$LOGS_PATH/$JOB_NAME/$JOB_NAME_FILE_NAME.err"
 fi
 
 if [ -z "$EXCLUSIVE" ]; then
@@ -267,6 +284,7 @@ export MAX_TOKENS
 export BATCH_SIZE
 export SPLIT
 export SHUFFLE
+export DATA_TYPE
 NUM_WORKERS="$CPUS_PER_TASK"
 export NUM_WORKERS
 echo "INPUT: $INPUT"
@@ -276,6 +294,7 @@ echo "SEQ_LEN: $SEQ_LEN"
 echo "MAX_TOKENS: $MAX_TOKENS"
 echo "BATCH_SIZE: $BATCH_SIZE"
 echo "SPLIT: $SPLIT"
+echo "DATA_TYPE: $DATA_TYPE"
 echo "SHUFFLE: $SHUFFLE"
 echo "NUM_WORKERS: $NUM_WORKERS"
 

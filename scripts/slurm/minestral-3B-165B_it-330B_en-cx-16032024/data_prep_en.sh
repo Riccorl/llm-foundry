@@ -25,4 +25,5 @@ source ~/llmfoundry-0.6.0/bin/python scripts/data_prep/convert_dataset_hf.py \
     --split train --concat_tokens 2048 --tokenizer /leonardo_scratch/large/userexternal/rorland1/data/minestral-350m-7B_it-7B_en-cx-13022024/tokenizer/minestral-350m-7B_it-7B_en-cx-13022024-hf \
     --max_tokens 330_000_000_000 \
     --num_workers 32 \
-    --shuffle
+    --shuffle \
+    --data_type arrow

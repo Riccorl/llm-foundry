@@ -166,7 +166,7 @@ class ConcatTokensDataset(IterableDataset):
                 i * self.write_batch_size : (i + 1) * self.write_batch_size
             ]
             encoded_shard = self.tokenizer(
-                shard["text"], truncation=False, padding=False
+                shard["text"], truncation=False, padding=False,
             )
             total_samples += len(encoded_shard["input_ids"])
             for encoded in encoded_shard["input_ids"]:

@@ -66,7 +66,7 @@ while getopts ":hd:u:rq:c:v:l:m:t:a:p:j:e:o:xis" opt; do
         OUTPUT="$OPTARG"
         ;;
     r)
-        RESUME="$OPTARG"
+        RESUME="TRUE"
         ;;
     q)
         ALLOW="$OPTARG"
@@ -177,11 +177,15 @@ if [ -z "$LOGS_PATH" ]; then
 fi
 
 if [ -z "$STD_OUT" ]; then
-    STD_OUT="$LOGS_PATH/$JOB_NAME/$JOB_NAME.out"
+    # extract the last part of the JOB_NAME if it is a file path
+    JOB_NAME_FILE_NAME=$(basename $JOB_NAME)
+    STD_OUT="$LOGS_PATH/$JOB_NAME/$JOB_NAME_FILE_NAME.out"
 fi
 
 if [ -z "$STD_ERR" ]; then
-    STD_ERR="$LOGS_PATH/$JOB_NAME/$JOB_NAME.err"
+    # extract the last part of the JOB_NAME if it is a file path
+    JOB_NAME_FILE_NAME=$(basename $JOB_NAME)
+    STD_ERR="$LOGS_PATH/$JOB_NAME/$JOB_NAME_FILE_NAME.err"
 fi
 
 if [ -z "$EXCLUSIVE" ]; then
@@ -214,6 +218,7 @@ fi
 
 export HF_DATASETS_CACHE=$SCRATCH/hf_cache
 export HUGGINGFACE_HUB_CACHE=$SCRATCH/hf_cache
+export HF_HUB_ENABLE_HF_TRANSFER=1
 export WANDB_MODE=offline
 # get Huggingface token from python
 export HF_TOKEN=$(python -c "import huggingface_hub; print(huggingface_hub.HfFolder.get_token() or '')")

@@ -74,7 +74,7 @@ while getopts ":hc:v:n:l:m:t:a:p:j:e:o:xt:g:i" opt; do
     g)
         GPU_PER_NODE="$OPTARG"
         ;;
-    i) 
+    i)
         INTERACTIVE="TRUE"
         ;;
     \?)
@@ -95,15 +95,6 @@ if [ -z "$NODES" ]; then
     NODES=1
 fi
 
-if [ -z "$LOGS_PATH" ]; then
-    # default logs path is in SCRATCH folder
-    LOGS_PATH="$SCRATCH/llm-foundry/training_logs"
-    # if logs path does not exist, create it
-    if [ ! -d "$LOGS_PATH" ]; then
-        mkdir -p "$LOGS_PATH"
-    fi
-fi
-
 if [ -z "$MODULES" ]; then
     MODULES="profile/deeplrn cuda/12.1"
 fi
@@ -121,15 +112,31 @@ if [ -z "$PARTITION" ]; then
 fi
 
 if [ -z "$JOB_NAME" ]; then
-    echo "JOB_NAME is not set. To set it, use the -j flag" && exit 1
+    # it not interactive, raise an error
+    if [ "$INTERACTIVE" = "FALSE" ]; then
+        echo "JOB_NAME is not set. To set it, use the -j flag" && exit 1
+    fi
+fi
+
+if [ -z "$LOGS_PATH" ]; then
+    # default logs path is in SCRATCH folder
+    LOGS_PATH="$SCRATCH/llm-foundry/training_logs"
+    # if logs path does not exist, create it
+    if [ ! -d "$LOGS_PATH/$JOB_NAME" ]; then
+        mkdir -p "$LOGS_PATH/$JOB_NAME"
+    fi
 fi
 
 if [ -z "$STD_OUT" ]; then
-    STD_OUT="$LOGS_PATH/$JOB_NAME.out"
+    # extract the last part of the JOB_NAME if it is a file path
+    JOB_NAME_FILE_NAME=$(basename $JOB_NAME)
+    STD_OUT="$LOGS_PATH/$JOB_NAME/$JOB_NAME_FILE_NAME.out"
 fi
 
 if [ -z "$STD_ERR" ]; then
-    STD_ERR="$LOGS_PATH/$JOB_NAME.err"
+    # extract the last part of the JOB_NAME if it is a file path
+    JOB_NAME_FILE_NAME=$(basename $JOB_NAME)
+    STD_ERR="$LOGS_PATH/$JOB_NAME/$JOB_NAME_FILE_NAME.err"
 fi
 
 if [ -z "$EXCLUSIVE" ]; then
@@ -169,12 +176,12 @@ fi
 # if NODES is 1, then we don't need all this shit'
 export NODES
 export GPU_PER_NODE
-if [ $NODES -gt 1 ]; then
-    export NPROCS=$GPU_PER_NODE # number of GPUs per node
-    export MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
-    export MASTER_PORT=11111
-    export WORLD_SIZE=$(($SLURM_NNODES * $NPROCS))    
-fi
+# if [ $NODES -gt 1 ]; then
+#     # export NPROCS=$GPU_PER_NODE # number of GPUs per node
+#     # export MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
+#     # export MASTER_PORT=11111
+#     # export WORLD_SIZE=$(($SLURM_NNODES * $NPROCS))
+# fi
 
 # check if $SCRATCH/hf_cache exists
 if [ ! -d "$SCRATCH/hf_cache" ]; then
