@@ -57,21 +57,72 @@ bash scripts/slurm/base_scripts/train_tokenizer.sh \
 
 Scripts we used to preprocess the data:
 
-RedPajamaV2 (Italian)
+#### Italian Data
+
+RedPajamaV2
 
 ```bash
 # redpajama
 bash scripts/slurm/base_scripts/data_preprocessing.sh \
-    --input /leonardo/prod/data/ai/culturax/2309/en \
-    --output /leonardo_work/IscrB_medit/training/minestral-3B-165B_it-330B_en-cx-16032024-2048/data/processed/en \
+    --input /leonardo_scratch/large/userexternal/rorland1/data/fineweb/data/ \
+    --output /leonardo_scratch/fast/IscrB_medit/training/minerva-7B-900B_it-900B_en-200B-code-21052024/data/processed/redpajama/ \
     --tokenizer /leonardo_scratch/large/userexternal/rorland1/data/minerva-7B-750B_it-800B_en-200B-code-21052024/tokenizer/minerva-7B-750B_it-800B_en-200B-code-21052024-v2-hf \
     --sequence-length 4096 \
-    --max_tokens 330_000_000_000 \
     --shuffle \
-    --cpu 32
+    --cpu 32 \
+    -j minerva-7B-900B_it-900B_en-200B-code-21052024/data-preprocessing-redpajama \
+    --max-tokens 900_000_000_000 \
+    --data-type parquet
 ```
 
-FineWeb (English)
+CulturaX
+
+```bash
+bash scripts/slurm/base_scripts/data_preprocessing.sh \
+    --input /leonardo/prod/data/ai/culturax/2309/it/train \
+    --output /leonardo_scratch/fast/IscrB_medit/training/minerva-7B-900B_it-900B_en-200B-code-21052024/data/processed/culturax/ \
+    --tokenizer /leonardo_scratch/large/userexternal/rorland1/data/minerva-7B-750B_it-800B_en-200B-code-21052024/tokenizer/minerva-7B-750B_it-800B_en-200B-code-21052024-v2-hf \
+    --sequence-length 4096 \
+    --shuffle \
+    --cpu 32 \
+    -j minerva-7B-900B_it-900B_en-200B-code-21052024/data-preprocessing-culturax \
+    --max-tokens 900_000_000_000 \
+    --data-type arrow
+```
+
+Wikipedia
+
+```bash
+bash scripts/slurm/base_scripts/data_preprocessing.sh \
+    --input /leonardo_scratch/large/userexternal/phuguetc/wikipedia_it \
+    --output /leonardo_scratch/fast/IscrB_medit/training/minerva-7B-900B_it-900B_en-200B-code-21052024/data/processed/wikipedia_it/ \
+    --tokenizer /leonardo_scratch/large/userexternal/rorland1/data/minerva-7B-750B_it-800B_en-200B-code-21052024/tokenizer/minerva-7B-750B_it-800B_en-200B-code-21052024-v2-hf \
+    --sequence-length 4096 \
+    --shuffle \
+    --cpu 32 \
+    -j minerva-7B-900B_it-900B_en-200B-code-21052024/data-preprocessing-wikipedia_it \
+    --max-tokens 900_000_000_000 \
+    --data-type jsonl
+```
+
+Books
+
+```bash
+bash scripts/slurm/base_scripts/data_preprocessing.sh \
+    --input /leonardo_scratch/large/userexternal/phuguetc/books_it \
+    --output /leonardo_scratch/fast/IscrB_medit/training/minerva-7B-900B_it-900B_en-200B-code-21052024/data/processed/books_it/ \
+    --tokenizer /leonardo_scratch/large/userexternal/rorland1/data/minerva-7B-750B_it-800B_en-200B-code-21052024/tokenizer/minerva-7B-750B_it-800B_en-200B-code-21052024-v2-hf \
+    --sequence-length 4096 \
+    --shuffle \
+    --cpu 32 \
+    -j minerva-7B-900B_it-900B_en-200B-code-21052024/data-preprocessing-books_it \
+    --max-tokens 900_000_000_000 \
+    --data-type jsonl
+```
+
+#### English Data
+
+FineWeb
 
 ```bash
 # fineweb
@@ -89,17 +140,97 @@ bash scripts/slurm/base_scripts/data_preprocessing.sh \
     --data-type parquet
 ```
 
+Books
+
+```bash
+bash scripts/slurm/base_scripts/data_preprocessing.sh \
+    --input /leonardo_scratch/large/userexternal/rorland1/data/hq/en/books \
+    --output /leonardo_scratch/fast/IscrB_medit/training/minerva-7B-900B_it-900B_en-200B-code-21052024/data/processed/books/ \
+    --tokenizer /leonardo_scratch/large/userexternal/rorland1/data/minerva-7B-750B_it-800B_en-200B-code-21052024/tokenizer/minerva-7B-750B_it-800B_en-200B-code-21052024-v2-hf \
+    --sequence-length 4096 \
+    --shuffle \
+    --cpu 32 \
+    -j minerva-7B-900B_it-900B_en-200B-code-21052024/data-preprocessing-books_it \
+    --max-tokens 900_000_000_000 \
+    --data-type jsonl
+```
+
+Arxiv
+
+```bash
+bash scripts/slurm/base_scripts/data_preprocessing.sh \
+    --input  /leonardo_scratch/large/userexternal/phuguetc/arxiv/ \
+    --output /leonardo_scratch/fast/IscrB_medit/training/minerva-7B-900B_it-900B_en-200B-code-21052024/data/processed/arxiv/ \
+    --tokenizer /leonardo_scratch/large/userexternal/rorland1/data/minerva-7B-750B_it-800B_en-200B-code-21052024/tokenizer/minerva-7B-750B_it-800B_en-200B-code-21052024-v2-hf \
+    --sequence-length 4096 \
+    --shuffle \
+    --cpu 32 \
+    -j minerva-7B-900B_it-900B_en-200B-code-21052024/data-preprocessing-arxiv \
+    --max-tokens 900_000_000_000 \
+    --data-type jsonl
+```
+
+StackExchange
+
+```bash
+bash scripts/slurm/base_scripts/data_preprocessing.sh \
+    --input  /leonardo_scratch/large/userexternal/phuguetc/stackexchange/ \
+    --output /leonardo_scratch/fast/IscrB_medit/training/minerva-7B-900B_it-900B_en-200B-code-21052024/data/processed/stackexchange/ \
+    --tokenizer /leonardo_scratch/large/userexternal/rorland1/data/minerva-7B-750B_it-800B_en-200B-code-21052024/tokenizer/minerva-7B-750B_it-800B_en-200B-code-21052024-v2-hf \
+    --sequence-length 4096 \
+    --shuffle \
+    --cpu 32 \
+    -j minerva-7B-900B_it-900B_en-200B-code-21052024/data-preprocessing-stackexchange \
+    --max-tokens 900_000_000_000 \
+    --data-type jsonl
+```
+
+Wikipedia
+
+```bash
+bash scripts/slurm/base_scripts/data_preprocessing.sh \
+    --input  /leonardo_scratch/large/userexternal/phuguetc/wikipedia_en \
+    --output /leonardo_scratch/fast/IscrB_medit/training/minerva-7B-900B_it-900B_en-200B-code-21052024/data/processed/wikipedia_en/ \
+    --tokenizer /leonardo_scratch/large/userexternal/rorland1/data/minerva-7B-750B_it-800B_en-200B-code-21052024/tokenizer/minerva-7B-750B_it-800B_en-200B-code-21052024-v2-hf \
+    --sequence-length 4096 \
+    --shuffle \
+    --cpu 32 \
+    -j minerva-7B-900B_it-900B_en-200B-code-21052024/data-preprocessing-wikipedia_en \
+    --max-tokens 900_000_000_000 \
+    --data-type jsonl
+```
+
+#### Code Data
+
+StarCoder2 (Code)
+
+```bash
+# starcoder
+bash scripts/slurm/base_scripts/data_preprocessing.sh \
+    --input /leonardo_scratch/large/userexternal/rorland1/data/starcoder/data/ \
+    --output /leonardo_scratch/fast/IscrB_medit/training/minerva-7B-900B_it-900B_en-200B-code-21052024/data/processed/starcoder/ \
+    --tokenizer /leonardo_scratch/large/userexternal/rorland1/data/minerva-7B-750B_it-800B_en-200B-code-21052024/tokenizer/minerva-7B-750B_it-800B_en-200B-code-21052024-v2-hf \
+    --sequence-length 4096 \
+    --shuffle \
+    --cpu 32 \
+    -j minerva-7B-900B_it-900B_en-200B-code-21052024/data-preprocessing-starcoder \
+    --max-tokens 900_000_000_000 \
+    --data-type parquet
+```
+
 ### Data statistics
 
 Number of tokens in the processed data:
 
 - RedPajamaV2 _ tokens:
-- FineWeb _ tokens:
+- Books IT 18571702272 tokens
+- Wikipedia IT 1274011648 tokens
+- FineWeb 1,079,829,446,656 tokens:
   - CC-MAIN-2024-10: 163,566,833,664 tokens
-  - CC-MAIN-2023-50:
-  - CC-MAIN-2023-40:
-  - CC-MAIN-2023-23:
-  - CC-MAIN-2023-14:
+  - CC-MAIN-2023-50: 251,415,752,704 tokens
+  - CC-MAIN-2023-40: 223,201,665,024 tokens
+  - CC-MAIN-2023-23: 229,115,260,928 tokens
+  - CC-MAIN-2023-14: 212,529,934,336 tokens
 
 ## Training
 

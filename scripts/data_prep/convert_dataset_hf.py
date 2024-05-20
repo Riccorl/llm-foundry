@@ -136,11 +136,16 @@ def build_hf_dataset(
         if os.path.isdir(dataset_name):
             # infer data type from file extension
             # data_type = dataset_name.split(".")[-1]
+            # if data_type == "jsonl":
+            #     # hug datasets expects "json" not "jsonl"
+            #     data_type = "json"
             data_files = glob(f"{dataset_name}/*.{data_type}")
         else:
             data_files = dataset_name
+        
+        print(f"Loading dataset from {data_files}")
         hf_dataset = hf_datasets.load_dataset(
-            data_type,
+            data_type if data_type != "jsonl" else "json",
             data_files=data_files,
             split=split,
             streaming=streaming,
