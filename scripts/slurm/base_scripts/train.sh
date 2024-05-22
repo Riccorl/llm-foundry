@@ -207,10 +207,10 @@ export INTERACTIVE
 export NCCL_ASYNC_ERROR_HANDLING=1
 
 # singolo nodo, 4 gpu, con e senza
-# export NCCL_IB_SL=1
-# export UCX_IB_SL=1
-# export NVSHMEM_IB_SL=1
-# export NVSHMEM_DISABLE_NCCL=1
+export NCCL_IB_SL=1
+export UCX_IB_SL=1
+export NVSHMEM_IB_SL=1
+export NVSHMEM_DISABLE_NCCL=1
 
 # echo the params
 echo "CURRENT_DIR: $CURRENT_DIR"

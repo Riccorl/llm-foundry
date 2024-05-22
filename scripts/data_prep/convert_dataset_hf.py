@@ -8,11 +8,12 @@ import platform
 from argparse import ArgumentParser, Namespace
 from enum import Enum
 from glob import glob
-from typing import Dict, Iterable, Optional, Union
+from typing import Dict, Iterable, List, Optional, Union
 
 import datasets as hf_datasets
 import psutil
 from streaming import MDSWriter
+import torch
 from torch.utils.data import DataLoader, Dataset, IterableDataset
 from tqdm import tqdm
 from transformers import PreTrainedTokenizerBase
@@ -62,7 +63,10 @@ def parse_args() -> Namespace:
         "--dataloader_batch_size", type=int, default=512, required=False
     )
     parser.add_argument("--shuffle", default=False, action="store_true")
+    parser.add_argument("--skip-dataloader", default=False, action="store_true")
     parser.add_argument("--data_type", type=str, default="jsonl")
+    parser.add_argument("--filter-by-domain", nargs="*", default=[])
+    parser.add_argument("--filter_by_length", type=int, default=None)
 
     parsed = parser.parse_args()
 
@@ -113,6 +117,9 @@ def build_hf_dataset(
     seed: int = 42,
     num_workers: Optional[int] = None,
     data_type: str = "jsonl",
+    filter_by_domain: List | None = None,
+    filter_by_length: int | None = None,
+    multi_process: bool = False,
 ) -> IterableDataset:
     """Build an IterableDataset over the HF C4 or pile source data.
 
@@ -131,21 +138,21 @@ def build_hf_dataset(
     Returns:
         An IterableDataset.
     """
+    if filter_by_domain is None:
+        filter_by_domain = []
+
     is_local = os.path.exists(dataset_name)
     if is_local:
         if os.path.isdir(dataset_name):
-            # infer data type from file extension
-            # data_type = dataset_name.split(".")[-1]
-            # if data_type == "jsonl":
-            #     # hug datasets expects "json" not "jsonl"
-            #     data_type = "json"
             data_files = glob(f"{dataset_name}/*.{data_type}")
         else:
             data_files = dataset_name
-        
-        print(f"Loading dataset from {data_files}")
+
+        # print(f"Loading dataset from {data_files}")
         hf_dataset = hf_datasets.load_dataset(
-            data_type if data_type != "jsonl" else "json",
+            (
+                data_type if data_type != "jsonl" else "json"
+            ),  # jsonl is not supported by HF
             data_files=data_files,
             split=split,
             streaming=streaming,
@@ -188,6 +195,9 @@ def build_hf_dataset(
             bos_text=bos_text,
             eos_text=eos_text,
             no_wrap=no_wrap,
+            filter_by_domain=filter_by_domain,
+            filter_by_length=filter_by_length,
+            multi_process=multi_process,
         )
     return dataset
 
@@ -206,7 +216,7 @@ def build_dataloader(
     # the aggregate device batch size
     # If not using workers, the torch DataLoader expects the default value for prefetch_factor,
     # which non-intuitively must be 2.
-    prefetch_factor = max(1, 2 * batch_size // num_workers) if num_workers > 0 else 2
+    prefetch_factor = max(1, 2 * batch_size // num_workers) if num_workers > 0 else None
 
     return DataLoader(
         dataset=dataset,
@@ -246,7 +256,7 @@ def main(args: Namespace) -> None:
     Args:
         args (Namespace): Commandline arguments.
     """
-    
+
     print("Processing args")
     for arg in vars(args):
         print(f"{arg}: {getattr(args, arg)}")
@@ -278,14 +288,20 @@ def main(args: Namespace) -> None:
             shuffle=args.shuffle,
             num_workers=args.num_workers,
             data_type=args.data_type,
+            filter_by_domain=args.filter_by_domain,
+            filter_by_length=args.filter_by_length,
+            multi_process=args.skip_dataloader,
+            streaming=not args.skip_dataloader,
         )
-        loader = build_dataloader(
-            dataset=dataset,
-            batch_size=args.dataloader_batch_size,
-            num_workers=args.num_workers,
-        )
-        samples = generate_samples(loader, truncate_num_samples=None)
-
+        if args.skip_dataloader:
+            samples = dataset
+        else:
+            loader = build_dataloader(
+                dataset=dataset,
+                batch_size=args.dataloader_batch_size,
+                num_workers=args.num_workers,
+            )
+            samples = generate_samples(loader, truncate_num_samples=None)
         # Write samples
         print(f"Converting {args.dataset} to MDS format...")
         print(
@@ -302,7 +318,9 @@ def main(args: Namespace) -> None:
             try:
                 for sample in samples:
                     processed_tokens += sample["num_tokens"]
-                    progress_bar.update(sample.pop("num_tokens").item())
+                    num_tokens = sample.pop("num_tokens")
+                    num_tokens = num_tokens.item() if isinstance(num_tokens, torch.Tensor) else num_tokens
+                    progress_bar.update(num_tokens)
                     out.write(sample)
                     if (
                         args.max_tokens is not None

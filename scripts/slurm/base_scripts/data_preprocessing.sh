@@ -14,6 +14,9 @@ Options:
   --batch-size BATCH_SIZE   Batch size of the dataloader for preprocessing
   --split SPLIT             Split of the dataset
   --data-type DATA_TYPE     Type of the dataset
+  --filter-by-domain DOMAIN Filter the dataset by domain
+  --filter-by-length LENGTH Filter the dataset by length
+  --skip-dataloader SKIP_DATALOADER Skip the dataloader
   -c --cpu CPUS_PER_TASK    Number of CPUs per task
   -s --shuffle SHUFFLE      Shuffle the dataset
   -v PYTHON_ENV             Python environment to use
@@ -44,6 +47,9 @@ for arg in "$@"; do
     '--batch-size') set -- "$@" '-b' ;;
     '--split') set -- "$@" '-w' ;;
     '--data-type') set -- "$@" '-z' ;;
+    '--filter-by-domain') set -- "$@" '-f' ;;
+    '--filter-by-length') set -- "$@" '-g' ;;
+    '--skip-dataloader') set -- "$@" '-k' ;;
     '--cpu') set -- "$@" '-c' ;;
     '--shuffle') set -- "$@" '-s' ;;
     '--log') set -- "$@" '-l' ;;
@@ -62,7 +68,7 @@ done
 
 # check for named params
 #while [ $OPTIND -le "$#" ]; do
-while getopts ":hu:d:y:r:q:b:w:c:sv:l:m:t:a:p:j:o:e:xiz:" opt; do
+while getopts ":hu:d:y:r:q:b:w:c:sv:l:m:t:a:p:j:o:e:xiz:f:g:k" opt; do
     case $opt in
     h)
         printf "%s$USAGE" && exit 0
@@ -87,6 +93,15 @@ while getopts ":hu:d:y:r:q:b:w:c:sv:l:m:t:a:p:j:o:e:xiz:" opt; do
         ;;
     w)
         SPLIT="$OPTARG"
+        ;;
+    f) 
+        DOMAIN="$OPTARG"
+        ;;
+    g)
+        LENGTH="$OPTARG"
+        ;;
+    k)
+        SKIP_DATALOADER="TRUE"
         ;;
     c)
         CPUS_PER_TASK="$OPTARG"
@@ -173,6 +188,26 @@ fi
 
 if [ -z "$SPLIT" ]; then
     SPLIT="train"
+fi
+
+if [ -z "$DOMAIN" ]; then
+    DOMAIN=""
+else
+    # split DOMAIN by comma
+    DOMAIN=$(echo $DOMAIN | tr "," " ")
+    DOMAIN="--filter-by-domain $DOMAIN"
+fi
+
+if [ -z "$LENGTH" ]; then
+    LENGTH=""
+else
+    LENGTH="--filter-by-length $LENGTH"
+fi
+
+if [ -z "$SKIP_DATALOADER" ]; then
+    SKIP_DATALOADER=""
+else
+    SKIP_DATALOADER="--skip-dataloader"
 fi
 
 if [ -z "$CPUS_PER_TASK" ]; then
@@ -285,7 +320,14 @@ export BATCH_SIZE
 export SPLIT
 export SHUFFLE
 export DATA_TYPE
-NUM_WORKERS="$CPUS_PER_TASK"
+export DOMAIN
+export LENGTH
+export SKIP_DATALOADER
+if [ $CPUS_PER_TASK -eq 1 ]; then
+    NUM_WORKERS=0
+else
+    NUM_WORKERS="$CPUS_PER_TASK"
+fi
 export NUM_WORKERS
 echo "INPUT: $INPUT"
 echo "OUTPUT: $OUTPUT"
@@ -295,7 +337,10 @@ echo "MAX_TOKENS: $MAX_TOKENS"
 echo "BATCH_SIZE: $BATCH_SIZE"
 echo "SPLIT: $SPLIT"
 echo "DATA_TYPE: $DATA_TYPE"
+echo "DOMAIN: $DOMAIN"
+echo "LENGTH: $LENGTH"
 echo "SHUFFLE: $SHUFFLE"
+echo "SKIP_DATALOADER: $SKIP_DATALOADER"
 echo "NUM_WORKERS: $NUM_WORKERS"
 
 if [ "$INTERACTIVE" = "TRUE" ]; then
