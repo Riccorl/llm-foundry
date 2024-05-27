@@ -50,7 +50,7 @@ if [ -z "$MODEL_DIR" ] || [ -z "$MODEL_NAME" ]; then
 fi
 
 if [ -z "$PYTHON_ENV" ]; then
-    PYTHON_ENV=~/llmfoundry-0.6.0/bin/activate
+    PYTHON_ENV=/leonardo_scratch/large/userexternal/rorland1/python-envs/llm-foundry-0.8.0-venv/bin/activate
 fi
 
 if [ -z "$MODULES" ]; then

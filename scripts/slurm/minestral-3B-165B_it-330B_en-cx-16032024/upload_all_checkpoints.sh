@@ -6,9 +6,11 @@ export HF_DATASETS_CACHE=$SCRATCH/hf_cache
 export HUGGINGFACE_HUB_CACHE=$SCRATCH/hf_cache
 export WANDB_MODE=offline
 # read Huggingface token from .env file
-export HF_TOKEN=$(cat .envs | grep HF_TOKEN | cut -d '=' -f2)
+# export HF_TOKEN=$(cat .envs | grep HF_TOKEN | cut -d '=' -f2)
+export HF_TOKEN=$(python -c "import huggingface_hub; print(huggingface_hub.HfFolder.get_token() or '')")
 
-source ~/llmfoundry-0.6.0/bin/activate
+
+source /leonardo_scratch/large/userexternal/rorland1/python-envs/llm-foundry-0.8.0-venv/bin/activate
 
 # cd to the directory where this script is located
 CURRENT_DIR="$(cd "$(dirname "$0")" && pwd)"

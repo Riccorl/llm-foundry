@@ -14,6 +14,7 @@ Options:
   -t TIME           Time for the job
   -a ACCOUNT        Account to use for the job
   -p PARTITION      Partition to use for the job
+  -k CHAIN          Number of job to chain
   -j JOB_NAME       Name of the job
   -o STD_OUT        Path to standard output file
   -e STD_ERR        Path to standard error file
@@ -27,7 +28,7 @@ Invalid options will show this help message and exit.
 
 # check for named params
 #while [ $OPTIND -le "$#" ]; do
-while getopts ":hc:v:n:l:m:t:a:p:j:e:o:xt:g:i" opt; do
+while getopts ":hc:v:n:l:m:t:a:p:j:e:o:xt:g:ik:" opt; do
     case $opt in
     h)
         printf "%s$USAGE" && exit 0
@@ -55,6 +56,9 @@ while getopts ":hc:v:n:l:m:t:a:p:j:e:o:xt:g:i" opt; do
         ;;
     p)
         PARTITION="$OPTARG"
+        ;;
+    k)
+        CHAIN="$OPTARG"
         ;;
     j)
         JOB_NAME="$OPTARG"
@@ -109,6 +113,10 @@ fi
 
 if [ -z "$PARTITION" ]; then
     PARTITION=boost_usr_prod
+fi
+
+if [ -z "$CHAIN" ]; then
+    CHAIN=1
 fi
 
 if [ -z "$JOB_NAME" ]; then
@@ -204,7 +212,8 @@ export INTERACTIVE
 
 # debug nvidia
 # force crashing on nccl issues like hanging broadcast
-export NCCL_ASYNC_ERROR_HANDLING=1
+# export NCCL_ASYNC_ERROR_HANDLING=1
+# export TORCH_NCCL_USE_COMM_NONBLOCKING=1
 
 # singolo nodo, 4 gpu, con e senza
 export NCCL_IB_SL=1
@@ -218,7 +227,6 @@ echo "CONFIG_PATH: $CONFIG_PATH"
 echo "PYTHON_ENV: $PYTHON_ENV"
 echo "TRAINING_SCRIPT: $TRAINING_SCRIPT"
 
-# srun ./scripts/slurm/minestral-3B-165B_it-330B_en-cx-16032024/train_multinode.sh
 if [ "$INTERACTIVE" = "TRUE" ]; then
     echo "Running job interactively"
     bash ./helpers/train.slurm
@@ -234,18 +242,58 @@ else
     echo "STD_OUT: $STD_OUT"
     echo "STD_ERR: $STD_ERR"
     echo "EXCLUSIVE: $EXCLUSIVE"
+    echo "CHAIN: $CHAIN"
     echo "Running job non-interactively"
-    sbatch -p $PARTITION \
-        -A $ACCOUNT \
-        --nodes=$NODES \
-        --ntasks=$NODES \
-        --time=$TIME \
-        --job-name=$JOB_NAME \
-        --output=$STD_OUT \
-        --error=$STD_ERR \
-        --ntasks-per-node=1 \
-        --cpus-per-task=8 \
-        --gres=gpu:$GPU_PER_NODE \
-        $EXCLUSIVE \
-        ./helpers/train.slurm
+    if [ $CHAIN -gt 1 ]; then
+        # chain jobs by submitting the next job in the chain
+        # capture the job id of the current job
+        JOB_OUTPUT=$(sbatch -p $PARTITION \
+            -A $ACCOUNT \
+            --nodes=$NODES \
+            --ntasks=$NODES \
+            --time=$TIME \
+            --job-name=$JOB_NAME \
+            --output="$STD_OUT.0" \
+            --error="$STD_ERR.0" \
+            --ntasks-per-node=1 \
+            --cpus-per-task=8 \
+            --gres=gpu:$GPU_PER_NODE \
+            $EXCLUSIVE \
+            ./helpers/train.slurm)
+        # extract the job id from "Submitted batch job 4751210"
+        JOB_ID=$(echo $JOB_OUTPUT | grep "Submitted batch job" | awk '{print $4}')
+        # chain the next job
+        for i in $(seq 2 $CHAIN); do
+            JOB_ID_AFTER=$(sbatch -p $PARTITION \
+                -A $ACCOUNT \
+                --nodes=$NODES \
+                --ntasks=$NODES \
+                --time=$TIME \
+                --job-name=$JOB_NAME \
+                --output="$STD_OUT.$i" \
+                --error="$STD_ERR.$i" \
+                --ntasks-per-node=1 \
+                --cpus-per-task=8 \
+                --gres=gpu:$GPU_PER_NODE \
+                $EXCLUSIVE \
+                --dependency=afterany:$JOB_ID \
+                ./helpers/train.slurm | grep "Submitted batch job" | awk '{print $4}')
+            echo "Chaining job $JOB_ID_AFTER after $JOB_ID"
+            JOB_ID=$JOB_ID_AFTER
+        done
+    else
+        sbatch -p $PARTITION \
+            -A $ACCOUNT \
+            --nodes=$NODES \
+            --ntasks=$NODES \
+            --time=$TIME \
+            --job-name=$JOB_NAME \
+            --output=$STD_OUT \
+            --error=$STD_ERR \
+            --ntasks-per-node=1 \
+            --cpus-per-task=8 \
+            --gres=gpu:$GPU_PER_NODE \
+            $EXCLUSIVE \
+            ./helpers/train.slurm
+    fi
 fi

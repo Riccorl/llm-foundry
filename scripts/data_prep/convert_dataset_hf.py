@@ -65,6 +65,7 @@ def parse_args() -> Namespace:
     parser.add_argument("--shuffle", default=False, action="store_true")
     parser.add_argument("--skip-dataloader", default=False, action="store_true")
     parser.add_argument("--data_type", type=str, default="jsonl")
+    parser.add_argument("--file_pattern", type=str, default="*")
     parser.add_argument("--filter-by-domain", nargs="*", default=[])
     parser.add_argument("--filter_by_length", type=int, default=None)
 
@@ -120,6 +121,7 @@ def build_hf_dataset(
     filter_by_domain: List | None = None,
     filter_by_length: int | None = None,
     multi_process: bool = False,
+    file_pattern: str | None = None,
 ) -> IterableDataset:
     """Build an IterableDataset over the HF C4 or pile source data.
 
@@ -144,11 +146,14 @@ def build_hf_dataset(
     is_local = os.path.exists(dataset_name)
     if is_local:
         if os.path.isdir(dataset_name):
-            data_files = glob(f"{dataset_name}/*.{data_type}")
+            # search in all subfolders
+            if file_pattern is None:
+                file_pattern = "*"
+            data_files = glob(f"{dataset_name}/**/{file_pattern}.{data_type}", recursive=True)
         else:
             data_files = dataset_name
 
-        # print(f"Loading dataset from {data_files}")
+        print(f"Sample of loading files from {data_files[:10]}")
         hf_dataset = hf_datasets.load_dataset(
             (
                 data_type if data_type != "jsonl" else "json"
@@ -292,6 +297,7 @@ def main(args: Namespace) -> None:
             filter_by_length=args.filter_by_length,
             multi_process=args.skip_dataloader,
             streaming=not args.skip_dataloader,
+            file_pattern=args.file_pattern,
         )
         if args.skip_dataloader:
             samples = dataset

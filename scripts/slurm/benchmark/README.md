@@ -35,3 +35,15 @@ bash /leonardo/home/userexternal/rorland1/llm-foundry/scripts/slurm/base_scripts
     -x \
     -t 1:00:00
 ```
+
+4 GPU 2 Node Hybrid Shard
+
+```bash
+bash /leonardo/home/userexternal/rorland1/llm-foundry/scripts/slurm/base_scripts/train.sh \
+    -c /leonardo/home/userexternal/rorland1/llm-foundry/scripts/slurm/benchmark/benchmark.yaml \
+    -g 4 \
+    -n 2 \
+    -j benchmark/benchmark-4gpu-2node-withoutenvs \
+    -x \
+    -t 1:00:00
+```

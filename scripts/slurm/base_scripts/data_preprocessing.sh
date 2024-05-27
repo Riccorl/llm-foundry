@@ -14,6 +14,7 @@ Options:
   --batch-size BATCH_SIZE   Batch size of the dataloader for preprocessing
   --split SPLIT             Split of the dataset
   --data-type DATA_TYPE     Type of the dataset
+  --file_pattern FILE_PATTERN File pattern to use for the dataset
   --filter-by-domain DOMAIN Filter the dataset by domain
   --filter-by-length LENGTH Filter the dataset by length
   --skip-dataloader SKIP_DATALOADER Skip the dataloader
@@ -47,6 +48,7 @@ for arg in "$@"; do
     '--batch-size') set -- "$@" '-b' ;;
     '--split') set -- "$@" '-w' ;;
     '--data-type') set -- "$@" '-z' ;;
+    '--file_pattern') set -- "$@" '-n' ;;
     '--filter-by-domain') set -- "$@" '-f' ;;
     '--filter-by-length') set -- "$@" '-g' ;;
     '--skip-dataloader') set -- "$@" '-k' ;;
@@ -68,7 +70,7 @@ done
 
 # check for named params
 #while [ $OPTIND -le "$#" ]; do
-while getopts ":hu:d:y:r:q:b:w:c:sv:l:m:t:a:p:j:o:e:xiz:f:g:k" opt; do
+while getopts ":hu:d:y:r:q:b:w:c:sv:l:m:t:a:p:j:o:e:xiz:f:g:kn:" opt; do
     case $opt in
     h)
         printf "%s$USAGE" && exit 0
@@ -96,6 +98,9 @@ while getopts ":hu:d:y:r:q:b:w:c:sv:l:m:t:a:p:j:o:e:xiz:f:g:k" opt; do
         ;;
     f) 
         DOMAIN="$OPTARG"
+        ;;
+    n)
+        FILE_PATTERN="$OPTARG"
         ;;
     g)
         LENGTH="$OPTARG"
@@ -196,6 +201,12 @@ else
     # split DOMAIN by comma
     DOMAIN=$(echo $DOMAIN | tr "," " ")
     DOMAIN="--filter-by-domain $DOMAIN"
+fi
+
+if [ -z "$FILE_PATTERN" ]; then
+    FILE_PATTERN=""
+else
+    FILE_PATTERN="--file_pattern $FILE_PATTERN"
 fi
 
 if [ -z "$LENGTH" ]; then
@@ -323,6 +334,7 @@ export DATA_TYPE
 export DOMAIN
 export LENGTH
 export SKIP_DATALOADER
+export FILE_PATTERN
 if [ $CPUS_PER_TASK -eq 1 ]; then
     NUM_WORKERS=0
 else
@@ -341,6 +353,7 @@ echo "DOMAIN: $DOMAIN"
 echo "LENGTH: $LENGTH"
 echo "SHUFFLE: $SHUFFLE"
 echo "SKIP_DATALOADER: $SKIP_DATALOADER"
+echo "FILE_PATTERN: $FILE_PATTERN"
 echo "NUM_WORKERS: $NUM_WORKERS"
 
 if [ "$INTERACTIVE" = "TRUE" ]; then

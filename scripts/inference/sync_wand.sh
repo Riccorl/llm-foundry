@@ -5,11 +5,11 @@ source ~/llmfoundry-0.6.0/bin/activate
 
 cd /leonardo/home/userexternal/rorland1/llm-foundry-0.6.0
 
-export HF_DATASETS_CACHE=$SCRATCH/hf_cache
-export HUGGINGFACE_HUB_CACHE=$SCRATCH/hf_cache
-export WANDB_MODE=offline
-# read Huggingface token from .env file
-export HF_TOKEN=$(cat .envs | grep HF_TOKEN | cut -d '=' -f2)
+# export HF_DATASETS_CACHE=$SCRATCH/hf_cache
+# export HUGGINGFACE_HUB_CACHE=$SCRATCH/hf_cache
+# export WANDB_MODE=offline
+# # read Huggingface token from .env file
+# export HF_TOKEN=$(cat .envs | grep HF_TOKEN | cut -d '=' -f2)
 
 
 # folder to sync

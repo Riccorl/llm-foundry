@@ -154,9 +154,21 @@ class ConcatTokensDataset(IterableDataset):
                     ):
                         continue
                 else:
-                    print("No domain information found in dataset, available keys: ", sample.keys())
+                    print(
+                        "No domain information found in dataset, available keys: ",
+                        sample.keys(),
+                    )
 
-            encoded = self.tokenizer(sample["text"], truncation=False, padding=False)
+            text = None
+            if "text" in sample:
+                text = sample["text"]
+            elif "raw_content" in sample:
+                text = sample["raw_content"]
+            else:
+                raise ValueError(
+                    "No text field found in dataset, available keys: ", sample.keys()
+                )
+            encoded = self.tokenizer(text, truncation=False, padding=False)
             if (
                 self.filter_by_length
                 and len(encoded["input_ids"]) <= self.filter_by_length
@@ -189,7 +201,15 @@ class ConcatTokensDataset(IterableDataset):
                 i * self.write_batch_size : (i + 1) * self.write_batch_size
             ]
 
-            text_in_shard = shard["text"]
+            if "text" in shard:
+                text_in_shard = shard["text"]
+            elif "raw_content" in shard:
+                text_in_shard = shard["raw_content"]
+            else:
+                raise ValueError(
+                    "No text field found in dataset, available keys: ", shard.keys()
+                )
+            # text_in_shard = shard["text"]
 
             # filter by domain
             if self.filter_by_domain:
@@ -210,7 +230,10 @@ class ConcatTokensDataset(IterableDataset):
                         ):
                             _text_in_shard.append(text)
                     else:
-                        print("No domain information found in dataset, available keys: ", shard.keys())
+                        print(
+                            "No domain information found in dataset, available keys: ",
+                            shard.keys(),
+                        )
                         _text_in_shard.append(text)
                 text_in_shard = _text_in_shard
 

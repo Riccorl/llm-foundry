@@ -1,19 +1,19 @@
-data_local: /leonardo_scratch/large/userexternal/rorland1/data/minestral-1B-100B_it-100B_en-cx-04032024/data/processed
-# data_local: /leonardo_scratch/fast/IscrB_medit/data/minestral-1B-100B_it-100B_en-cx-04032024/data/processed
+data_local: /leonardo_scratch/fast/IscrB_medit/training/minerva-7B-900B_it-900B_en-200B-code-21052024/data/processed
 data_remote: # If blank, files must be present in data_local
 max_seq_len: 4096
 global_seed: 17
 # num_cpus_per_node: 8
 
 # Run Name
-run_name: minerva-7B-21052024 # If left blank, will be read from env var $RUN_NAME
+run_name: minerva-7B-1T_it-1T_en-200B_code-27052024 # If left blank, will be read from env var $RUN_NAME
 
 # Model
 model:
   use_auth_token: ${oc.env:HF_TOKEN} # ${oc.env:HF_TOKEN}
   name: hf_causal_lm
   pretrained_model_name_or_path: mistralai/Mistral-7B-v0.1
-  use_flash_attention_2: True
+  # use_flash_attention_2: True
+  attn_implementation: flash_attention_2 # eager, flash_attention_2 and sdpa
   config_overrides:
     # Params: 1006700544
     # intermediate_size: 7168 # ~3.5 * hidden_size
@@ -24,11 +24,12 @@ model:
     vocab_size: 51200
     max_position_embeddings: ${max_seq_len} # max_seq_len * 4
     sliding_window: null # no sliding window
+    use_cache: false
   pretrained: False
 
 # Tokenizer
 tokenizer:
-  name: /leonardo_scratch/large/userexternal/rorland1/data/minerva-7B-750B_it-800B_en-200B-code-21052024/tokenizer/minerva-7B-750B_it-800B_en-200B-code-21052024-v2-hf
+  name: /leonardo_scratch/large/userexternal/rorland1/data/minerva-7B-750B_it-800B_en-200B-code-21052024/tokenizer/minerva-7B-750B_it-800B_en-200B-code-21052024-tokenizers-trainer-hf
   kwargs:
     # model_max_length: 1000000000000000019884624838656 # infinitymodel_max_length: ${max_seq_len}
     model_max_length: ${max_seq_len} # infinitymodel_max_length: ${max_seq_len}
@@ -49,11 +50,79 @@ train_loader:
     shuffle_seed: ${global_seed}
     max_seq_len: ${max_seq_len}
     streams:
-      # en:
-      #   local: ${data_local}/en
-      #   split: train
-      it:
-        local: ${data_local}/it
+      # it web
+      it_culturax:
+        local: ${data_local}/it/culturax-filtered
+        split: train
+        repeat: 1.5
+      it_redpajama_head:
+        local: ${data_local}/it/redpajama-head
+        split: train
+        repeat: 1.3
+      it_redpajama_middle:
+        local: ${data_local}/it/redpajama-middle
+        split: train
+      # it hq
+      it_wikipedia:
+        local: ${data_local}/it/wikipedia_it
+        split: train
+      it_books:
+        local: ${data_local}/it/books_it
+        split: train
+        repeat: 2.0
+      it_eurlex:
+        local: ${data_local}/it/eurlex_it
+        split: train
+      it_gazzetta:
+        local: ${data_local}/it/gazetta
+        split: train
+
+      # en web
+      en_fineweb_cc202410:
+        local: ${data_local}/en/fineweb/CC-MAIN-2024-10
+        split: train
+      en_fineweb_cc202350:
+        local: ${data_local}/en/fineweb/CC-MAIN-2023-50
+        split: train
+      en_fineweb_cc202340:
+        local: ${data_local}/en/fineweb/CC-MAIN-2023-40
+        split: train
+      en_fineweb_cc202323:
+        local: ${data_local}/en/fineweb/CC-MAIN-2023-23
+        split: train
+      en_fineweb_cc202314:
+        local: ${data_local}/en/fineweb/CC-MAIN-2023-14
+        split: train
+
+      # en hq
+      en_arxiv_1:
+        local: ${data_local}/en/arxiv/part1
+        split: train
+      en_arxiv_2:
+        local: ${data_local}/en/arxiv/part2
+        split: train
+      en_arxiv_3:
+        local: ${data_local}/en/arxiv/part3
+        split: train
+      en_arxiv_4:
+        local: ${data_local}/en/arxiv/part4
+        split: train
+      en_stackexchange:
+        local: ${data_local}/en/stackexchange
+        split: train
+      en_wikipedia:
+        local: ${data_local}/en/wikipedia_en
+        split: train
+      en_books:
+        local: ${data_local}/en/gutenberg_en
+        split: train
+
+      # code
+      code_part_1:
+        local: ${data_local}/code/starcoder2
+        split: train
+      code_part_2:
+        local: ${data_local}/code/starcoder2_part2
         split: train
 
 # eval_loader:
@@ -75,17 +144,17 @@ train_loader:
 # Optimization
 scheduler:
   name: cosine_with_warmup
-  t_warmup: 100ba
+  t_warmup: 2000ba #  llama2 uses 2000 steps
   alpha_f: 0.1
 
 optimizer:
   name: decoupled_adamw
-  lr: 2.0e-4
+  lr: 3.0e-4
   betas:
     - 0.9
     - 0.95
   eps: 1.0e-08
-  weight_decay: 0.0
+  weight_decay: 1.0e-05
 
 algorithms:
   gradient_clipping:
@@ -93,19 +162,20 @@ algorithms:
     clipping_threshold: 1.0
 
 # max_duration = num_tokens / (max_seq_len * global_train_batch_size)
-# ~200B tokens = max_seq_len * global_train_batch_size * max_duration
-# 200B is 200000000000
-max_duration: 47684ba #  global_train_batch_size: 2048
+# ~2T tokens = max_seq_len * global_train_batch_size * max_duration
+# ~2T is 2481170561843
+# max duration is then 2481170561843 / (4096 * 1024) = 591_558
+max_duration: 591558ba #  global_train_batch_size: 4096
 # eval_interval: 1000ba
 eval_interval: 0
 eval_first: false
 eval_subset_num_batches: -1
-global_train_batch_size: 64
+global_train_batch_size: 1024
 
 # System
 seed: ${global_seed}
 device_eval_batch_size: 16
-device_train_microbatch_size: 8
+device_train_microbatch_size: 4
 # device_train_microbatch_size: auto
 precision: amp_bf16
 # precision: fp32 # for debugging in cpu
@@ -115,7 +185,8 @@ fsdp_config:
   # sharding_strategy: FULL_SHARD
   sharding_strategy: HYBRID_SHARD
   mixed_precision: PURE
-  activation_checkpointing: False
+  activation_checkpointing: true
+  # activation_checkpointing: false
   activation_checkpointing_reentrant: false
   activation_cpu_offload: false
   limit_all_gathers: true
@@ -147,9 +218,11 @@ callbacks:
 loggers:
   wandb:
     entity: "riccorl"
-    project: "llm-foundry-pretrain"
+    project: "minerva-llms-7B"
     init_kwargs:
       mode: "offline"
+      id: ${run_name}
+      dir: "/leonardo_scratch/large/userexternal/rorland1/llm-foundry/training_logs/minerva-7B-900B_it-900B_en-200B-code-21052024/"
 
 # Checkpoint to local filesystem or remote object store
 save_interval: 1000ba

@@ -172,9 +172,13 @@ class ComposerHFCausalLM(HuggingFaceModelWithFSDP):
         # Set up Hugging Face args
         trust_remote_code = om_model_config.get('trust_remote_code', True)
         use_auth_token = om_model_config.get('use_auth_token', False)
-        use_flash_attention_2 = om_model_config.get(
-            'use_flash_attention_2',
-            False,
+        # use_flash_attention_2 = om_model_config.get(
+        #     'use_flash_attention_2',
+        #     False,
+        # )
+        attn_implementation = om_model_config.get(
+            'attn_implementation',
+            "eager",
         )
         load_in_8bit = om_model_config.get('load_in_8bit', False)
 
@@ -182,11 +186,11 @@ class ComposerHFCausalLM(HuggingFaceModelWithFSDP):
         init_device = om_model_config.get('init_device', 'cpu')
         # Resolve "mixed" init device to either "cpu" or "meta"
         resolved_init_device = hf_get_init_device(init_device)
-        requested_attention_implementation = 'flash_attention_2' if use_flash_attention_2 else 'eager'
+        # requested_attention_implementation = 'flash_attention_2' if use_flash_attention_2 else 'eager'
 
-        if use_flash_attention_2 and not is_flash_v2_installed():
+        if attn_implementation == "flash_attention_2" and not is_flash_v2_installed():
             raise ValueError(
-                'use_flash_attention_2 is set to True, but flash-attention 2 is not installed. '
+                'attention_type is set to `flash`, but flash-attention 2 is not installed. '
                 + 'Please `pip install llm-foundry[gpu]`.',
             )
 
@@ -195,7 +199,7 @@ class ComposerHFCausalLM(HuggingFaceModelWithFSDP):
             pretrained_model_name_or_path,
             trust_remote_code=trust_remote_code,
             use_auth_token=use_auth_token,
-            attn_implementation=requested_attention_implementation,
+            attn_implementation=attn_implementation,
             use_cache=
             False,  # Necessary due to https://github.com/huggingface/transformers/issues/28056
         )
@@ -210,7 +214,7 @@ class ComposerHFCausalLM(HuggingFaceModelWithFSDP):
             *args,  # type: ignore
             **kwargs,  # type: ignore
         ):  # type: ignore
-            config._attn_implementation = requested_attention_implementation
+            config._attn_implementation = attn_implementation
             return config
 
         PreTrainedModel._autoset_attn_implementation = classmethod(
