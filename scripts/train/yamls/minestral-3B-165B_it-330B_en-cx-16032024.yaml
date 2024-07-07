@@ -1,0 +1,184 @@
+# data_local: /leonardo_work/IscrB_medit/training/minestral-3B-165B_it-330B_en-cx-16032024-2048/data/processed
+# data_local: /leonardo_scratch/fast/IscrB_medit/data/minestral-1B-100B_it-100B_en-cx-04032024/data/processed
+data_local: /leonardo_scratch/fast/IscrB_medit/training/minestral-3B-165B_it-330B_en-cx-16032024-2048/data/processed
+data_remote: # If blank, files must be present in data_local
+max_seq_len: 2048
+global_seed: 17
+# num_cpus_per_node: 8
+
+# Run Name
+run_name: minestral-3B-165B_it-330B_en-cx-13042024 # If left blank, will be read from env var $RUN_NAME
+
+# Model
+model:
+  # name: mpt_causal_lm
+  # init_device: meta
+  # d_model: 2560
+  # n_heads: 20  # Modified 32->20 so that d_head == 128 to statisfy FlashAttention
+  # n_layers: 32
+  # expansion_ratio: 4
+  # max_seq_len: ${max_seq_len}
+  # vocab_size: 32768
+  # attn_config:
+  #   attn_impl: triton
+  # use_auth_token: ${oc.env:HF_TOKEN}
+  use_auth_token: ${oc.env:HF_TOKEN}
+  name: hf_causal_lm
+  use_flash_attention_2: True
+  pretrained_model_name_or_path: mistralai/Mistral-7B-v0.1
+  config_overrides:
+    #   # Params: 3_208_808_960
+    #   # intermediate_size: 10240 # ~4 * hidden_size
+    #   # hidden_size: 2560
+    #   # num_attention_heads: 32
+    #   # num_hidden_layers: 32
+    #   # num_key_value_heads: 8
+    #   # vocab_size: 32768
+    #   # max_position_embeddings: 32768 # max_seq_len * 8
+    #   # sliding_window: ${max_seq_len}
+
+    # Params: 2_894_236_160
+    intermediate_size: 8960 # ~3.5 * hidden_size
+    hidden_size: 2560
+    num_attention_heads: 32
+    num_hidden_layers: 32
+    num_key_value_heads: 8
+    vocab_size: 32768
+    max_position_embeddings: 16384 # max_seq_len * 8
+    sliding_window: ${max_seq_len}
+  pretrained: False
+
+# Tokenizer
+tokenizer:
+  name: /leonardo_scratch/large/userexternal/rorland1/data/minestral-350m-7B_it-7B_en-cx-13022024/tokenizer/minestral-350m-7B_it-7B_en-cx-13022024-hf
+  kwargs:
+    model_max_length: 1000000000000000019884624838656 # infinity
+    # model_max_length: ${max_seq_len}
+
+# Dataloaders
+train_loader:
+  name: text
+  drop_last: true
+  num_workers: 8
+  dataset:
+    predownload: 65536
+    shuffle: True
+    num_canonical_nodes: 8
+    shuffle_block_size: 262144
+    # local: ${data_local}
+    # split: en
+    # shuffle_algo: py1b
+    shuffle_seed: ${global_seed}
+    max_seq_len: ${max_seq_len}
+    streams:
+      en:
+        local: ${data_local}/en
+        split: train
+      it:
+        local: ${data_local}/it
+        split: train
+        repeat: 2
+
+# eval_loader:
+#   name: text
+#   drop_last: false
+#   num_workers: 8
+#   dataset:
+#     shuffle: false
+#     max_seq_len: ${max_seq_len}
+#     shuffle_seed: ${global_seed}
+#     streams:
+#       en:
+#         local: ${data_local}/en
+#         split: eval
+#       it:
+#         local: ${data_local}/it
+#         split: eval
+
+# Optimization
+scheduler:
+  name: cosine_with_warmup
+  t_warmup: 3148ba
+  alpha_f: 0.1
+
+optimizer:
+  name: decoupled_adamw
+  lr: 2.0e-4
+  betas:
+    - 0.9
+    - 0.95
+  eps: 1.0e-08
+  weight_decay: 0.0
+
+algorithms:
+  gradient_clipping:
+    clipping_type: norm
+    clipping_threshold: 1.0
+
+# max_duration = num_tokens / (max_seq_len * global_train_batch_size)
+# ~660B tokens = max_seq_len * global_train_batch_size * max_duration
+# 660B is 660000000000
+max_duration: 157357ba #  global_train_batch_size: 2048
+# eval_interval: 1000ba
+eval_interval: 0
+eval_first: false
+eval_subset_num_batches: -1
+global_train_batch_size: 2048
+
+# System
+seed: ${global_seed}
+device_eval_batch_size: 16
+# device_train_microbatch_size: 8
+device_train_microbatch_size: auto
+precision: amp_bf16
+# precision: fp32 # for debugging in cpu
+
+# FSDP
+fsdp_config:
+  sharding_strategy: FULL_SHARD
+  mixed_precision: PURE
+  activation_checkpointing: true
+  activation_checkpointing_reentrant: false
+  activation_cpu_offload: false
+  limit_all_gathers: true
+
+# deepspeed_config:
+#   train_batch_size: 2048
+#   train_micro_batch_size_per_gpu: 8
+#   gradient_accumulation_steps: 2       # 2048/6/4 = 8
+#   bfloat16:
+#     enabled: True
+#   zero_optimization:
+#     stage: 3
+
+# Logging
+progress_bar: true
+log_to_console: true
+console_log_interval: 1ba
+
+callbacks:
+  # optimizer_monitor:
+  #   log_optimizer_metrics: true
+  speed_monitor:
+    window_size: 10
+    gpu_flops_available: true
+  lr_monitor: {}
+  memory_monitor: {}
+  runtime_estimator: {}
+
+loggers:
+  wandb:
+    entity: "riccorl"
+    project: "llm-foundry-pretrain"
+    init_kwargs:
+      mode: "offline"
+
+# Checkpoint to local filesystem or remote object store
+save_interval: 1000ba
+save_num_checkpoints_to_keep: -1 # Important, this cleans up checkpoints saved to DISK
+save_folder: /leonardo_scratch/large/userexternal/rorland1/llm-foundry/runs/{run_name}
+# save_folder: s3://my-bucket/my-folder/{run_name}/checkpoints
+
+# Load from local filesystem or remote object store
+load_path: /leonardo_scratch/large/userexternal/rorland1/llm-foundry/runs/{run_name}/latest-rank{rank}.pt
+# load_path: s3://my-bucket/my-folder/gpt-125m/checkpoints/latest-rank{rank}.pt

@@ -1,0 +1,152 @@
+data_local: /leonardo_work/IscrB_medit/llm-foundry/culturax/350M-model/processed
+data_remote: # If blank, files must be present in data_local
+max_seq_len: 2048
+global_seed: 17
+# num_cpus_per_node: 8
+
+# Run Name
+run_name: minestral-350m-25122023 # If left blank, will be read from env var $RUN_NAME
+
+# Model
+model:
+  use_auth_token: ${oc.env:HF_TOKEN}
+  name: hf_causal_lm
+  # pretrained_model_name_or_path: gpt2-medium
+  pretrained_model_name_or_path: mistralai/Mistral-7B-v0.1
+  use_flash_attention_2: True
+  config_overrides:
+    # Params: 473_470_464 
+    # intermediate_size: 5376 # 3.5 * hidden_size
+    # hidden_size: 1536
+    # num_attention_heads: 12
+    # num_hidden_layers: 12
+    # num_key_value_heads: 4
+
+    # Params: 351_573_120 
+    intermediate_size: 4032 # 3.5 * hidden_size
+    hidden_size: 1152
+    num_attention_heads: 16
+    num_hidden_layers: 16
+    num_key_value_heads: 4
+    vocab_size: 32768
+    max_position_embeddings: 16384 # max_seq_len * 4
+    sliding_window: ${max_seq_len}
+  pretrained: False
+
+# Tokenizer
+tokenizer:
+  name: /leonardo_work/IscrB_medit/tokenizer/trained/minestreal350m-en-it-hf
+  kwargs:
+    model_max_length: ${max_seq_len}
+
+# Dataloaders
+train_loader:
+  name: text
+  drop_last: true
+  num_workers: 16
+  dataset:
+    shuffle: True
+    num_canonical_nodes: 16
+    shuffle_block_size: 262144
+    # local: ${data_local}
+    # split: en
+    # shuffle_algo: py1b
+    shuffle_seed: ${global_seed}
+    max_seq_len: ${max_seq_len}
+    streams:
+      en:
+        local: ${data_local}
+        split: en
+      it:
+        local: ${data_local}
+        split: it
+
+# eval_loader:
+#   name: text
+#   dataset:
+#     local: ${data_local}
+#     remote: ${data_remote}
+#     split: val
+#     shuffle: false
+#     max_seq_len: ${max_seq_len}
+#     shuffle_seed: ${global_seed}
+#   drop_last: false
+#   num_workers: 8
+
+# Optimization
+scheduler:
+  name: cosine_with_warmup
+  t_warmup: 115ba # 2% of max_duration
+  alpha_f: 0.1
+
+optimizer:
+  name: decoupled_adamw
+  lr: 3.0e-4
+  betas:
+  - 0.9
+  - 0.95
+  eps: 1.0e-08
+  weight_decay: 0.0
+
+algorithms:
+  gradient_clipping:
+    clipping_type: norm
+    clipping_threshold: 1.0
+
+# max_duration = num_tokens / (max_seq_len * global_train_batch_size)
+# ~6B tokens = max_seq_len * global_train_batch_size * max_duration 
+# 6B is 6000000000
+max_duration: 5723ba #  global_train_batch_size: 512
+# eval_interval: 500ba
+eval_interval: 0
+eval_first: false
+eval_subset_num_batches: -1
+global_train_batch_size: 512
+
+# System
+seed: ${global_seed}
+device_eval_batch_size: 8
+device_train_microbatch_size: 8
+# device_train_microbatch_size: auto
+precision: amp_bf16
+# precision: fp32 # for debugging in cpu
+
+# FSDP
+fsdp_config:
+  sharding_strategy: FULL_SHARD
+  mixed_precision: PURE
+  activation_checkpointing: False
+  activation_checkpointing_reentrant: false
+  activation_cpu_offload: false
+  limit_all_gathers: true
+
+# Logging
+progress_bar: true
+log_to_console: true
+console_log_interval: 1ba
+
+callbacks:
+  # optimizer_monitor:
+  #   log_optimizer_metrics: true
+  speed_monitor:
+    window_size: 10
+  lr_monitor: {}
+  memory_monitor: {}
+  runtime_estimator: {}
+
+loggers:
+  wandb:
+    entity: "riccorl"
+    project: "llm-foundry-pretrain"
+    init_kwargs:
+      mode: "offline"
+
+# Checkpoint to local filesystem or remote object store
+save_interval: 500ba
+save_num_checkpoints_to_keep: 3  # Important, this cleans up checkpoints saved to DISK
+save_folder:  /leonardo_work/IscrB_medit/llm-foundry/runs/{run_name}
+# save_folder: s3://my-bucket/my-folder/{run_name}/checkpoints
+
+# Load from local filesystem or remote object store
+# load_path: ./gpt-125m/checkpoints/latest-rank{rank}.pt
+# load_path: s3://my-bucket/my-folder/gpt-125m/checkpoints/latest-rank{rank}.pt
