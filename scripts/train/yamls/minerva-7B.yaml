@@ -9,20 +9,13 @@ run_name: minerva-7B-1T_it-1T_en-200B_code-25052024-32 # If left blank, will be 
 
 # Model
 model:
-  use_auth_token: ${oc.env:HF_TOKEN} # ${oc.env:HF_TOKEN}
+  use_auth_token: ${oc.env:HF_TOKEN}
   name: hf_causal_lm
   pretrained_model_name_or_path: mistralai/Mistral-7B-v0.1
-  # use_flash_attention_2: True
-  attn_implementation: flash_attention_2 # eager, flash_attention_2 and sdpa
+  attn_implementation: flash_attention_2 
   config_overrides:
-    # Params: 1006700544
-    # intermediate_size: 7168 # ~3.5 * hidden_size
-    # hidden_size: 2048
-    # num_attention_heads: 16
-    # num_hidden_layers: 16
-    # num_key_value_heads: 4
     vocab_size: 51200
-    max_position_embeddings: ${max_seq_len} # max_seq_len * 4
+    max_position_embeddings: ${max_seq_len}
     sliding_window: null # no sliding window
     use_cache: false
   pretrained: False
@@ -125,22 +118,6 @@ train_loader:
         local: ${data_local}/code/starcoder2_part2
         split: train
 
-# eval_loader:
-#   name: text
-#   drop_last: false
-#   num_workers: 8
-#   dataset:
-#     shuffle: false
-#     max_seq_len: ${max_seq_len}
-#     shuffle_seed: ${global_seed}
-#     streams:
-#       en:
-#         local: ${data_local}/en
-#         split: eval
-#       it:
-#         local: ${data_local}/it
-#         split: eval
-
 # Optimization
 scheduler:
   name: cosine_with_warmup
@@ -182,7 +159,8 @@ precision: amp_bf16
 
 # FSDP
 fsdp_config:
-  sharding_strategy: FULL_SHARD
+  # sharding_strategy: FULL_SHARD
+  sharding_strategy: HYBRID_SHARD
   mixed_precision: PURE
   activation_checkpointing: true
   # activation_checkpointing: false
@@ -220,8 +198,6 @@ loggers:
     project: "minerva-llms-7B"
     init_kwargs:
       mode: "offline"
-      # id: ${run_name}
-      dir: "/leonardo_scratch/large/userexternal/rorland1/llm-foundry/training_logs/minerva-7B-900B_it-900B_en-200B-code-21052024/"
 
 # Checkpoint to local filesystem or remote object store
 save_interval: 500ba
