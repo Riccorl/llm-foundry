@@ -131,4 +131,5 @@ class ConcatTokensDataset(IterableDataset):
                 yield {
                     # convert to bytes to store in MDS binary format
                     'tokens': np.asarray(concat_sample).tobytes(),
+                    "num_tokens": len(concat_sample),
                 }
