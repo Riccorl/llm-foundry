@@ -22,4 +22,4 @@ source ~/llmfoundry-cuda-flash-attn2-env/bin/activate
     --dataset /leonardo/prod/data/ai/culturax/2309/it \
     --out_root /leonardo_scratch/large/userexternal/rorland1/data/minestral-1B-100B_it-100B_en-cx-04032024/data/processed/it \
     --split train --concat_tokens 2048 --tokenizer /leonardo_scratch/large/userexternal/rorland1/data/minestral-350m-7B_it-7B_en-cx-13022024/tokenizer/minestral-350m-7B_it-7B_en-cx-13022024-hf \
-    --num_workers 32
+    --num_workers 32 --max_tokens 100_000_000_000
