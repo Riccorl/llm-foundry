@@ -1,42 +1,18 @@
-# data_local: /leonardo_work/IscrB_medit/training/minestral-3B-165B_it-330B_en-cx-16032024-2048/data/processed
-# data_local: /leonardo_scratch/fast/IscrB_medit/data/minestral-1B-100B_it-100B_en-cx-04032024/data/processed
 data_local: /leonardo_scratch/fast/IscrB_medit/training/minestral-3B-165B_it-330B_en-cx-16032024-2048/data/processed
 data_remote: # If blank, files must be present in data_local
 max_seq_len: 2048
 global_seed: 17
-# num_cpus_per_node: 8
 
 # Run Name
 run_name: minestral-3B-165B_it-330B_en-cx-13042024 # If left blank, will be read from env var $RUN_NAME
 
 # Model
 model:
-  # name: mpt_causal_lm
-  # init_device: meta
-  # d_model: 2560
-  # n_heads: 20  # Modified 32->20 so that d_head == 128 to statisfy FlashAttention
-  # n_layers: 32
-  # expansion_ratio: 4
-  # max_seq_len: ${max_seq_len}
-  # vocab_size: 32768
-  # attn_config:
-  #   attn_impl: triton
-  # use_auth_token: ${oc.env:HF_TOKEN}
   use_auth_token: ${oc.env:HF_TOKEN}
   name: hf_causal_lm
   use_flash_attention_2: True
   pretrained_model_name_or_path: mistralai/Mistral-7B-v0.1
   config_overrides:
-    #   # Params: 3_208_808_960
-    #   # intermediate_size: 10240 # ~4 * hidden_size
-    #   # hidden_size: 2560
-    #   # num_attention_heads: 32
-    #   # num_hidden_layers: 32
-    #   # num_key_value_heads: 8
-    #   # vocab_size: 32768
-    #   # max_position_embeddings: 32768 # max_seq_len * 8
-    #   # sliding_window: ${max_seq_len}
-
     # Params: 2_894_236_160
     intermediate_size: 8960 # ~3.5 * hidden_size
     hidden_size: 2560
@@ -65,9 +41,6 @@ train_loader:
     shuffle: True
     num_canonical_nodes: 8
     shuffle_block_size: 262144
-    # local: ${data_local}
-    # split: en
-    # shuffle_algo: py1b
     shuffle_seed: ${global_seed}
     max_seq_len: ${max_seq_len}
     streams:
