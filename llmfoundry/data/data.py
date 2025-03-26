@@ -151,7 +151,7 @@ class ConcatTokensDataset(AbstractConcatTokensDataset):
         self.hf_dataset = hf_dataset
         super().__init__(tokenizer, max_length, bos_text, eos_text, no_wrap)
 
-    def __iter__(self) -> Iterable[dict[str, NDArray]]:
+    def __iter__(self) -> Iterable[dict[str, NDArray | int]]:
         buffer = []
         for sample in self.hf_dataset:
             encoded = self.tokenizer(
@@ -167,6 +167,7 @@ class ConcatTokensDataset(AbstractConcatTokensDataset):
                 yield {
                     # convert to ndarray to store in MDS format
                     'tokens': np.asarray(concat_sample, dtype=np.int32),
+                    "num_tokens": len(concat_sample),
                 }
 
 
