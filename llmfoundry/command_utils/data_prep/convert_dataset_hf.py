@@ -176,6 +176,8 @@ def build_hf_dataset(
     data_type: str = "jsonl",
     streaming: bool = True,
     num_workers: Optional[int] = None,
+    shuffle: bool = False,
+    seed: int = 42,
 ) -> IterableDataset:
     """Build an IterableDataset over the HF C4 or pile source data.
 
@@ -218,6 +220,10 @@ def build_hf_dataset(
         hf_dataset = hf_datasets.load_dataset(
             path=dataset_name, name=data_subset, split=split, streaming=streaming,
         )
+    
+    if shuffle:
+        print("Shuffling dataset")
+        hf_dataset = hf_dataset.shuffle(seed=seed)
 
     # hf_dataset = hf_datasets.load_dataset(
     #     path=dataset_name,
@@ -342,6 +348,8 @@ def convert_dataset_hf(
     no_wrap: bool,
     num_workers: Optional[int],
     max_tokens: Optional[int] = None,
+    shuffle: bool = False,
+    val_tokens: int = 0,
 ) -> None:
     """Converts HuggingFace datasets to MDS format.
 
@@ -404,10 +412,11 @@ def convert_dataset_hf(
             eos_text=eos_text,
             no_wrap=no_wrap,
             tokenizer=built_tokenizer,
+            shuffle=shuffle,
         )
         loader = build_dataloader(
             dataset=hf_dataset,
-            batch_size=512,
+            batch_size=1024,
             num_workers=num_workers,
         )
         samples = generate_samples(
@@ -464,6 +473,34 @@ def convert_dataset_hf(
             except Exception as e:
                 print(f"Exception: {e}")
                 print(f"Processed {processed_tokens} tokens")
+        
+
+        if val_tokens > 0:
+            print(f"`val_tokens` is set to {val_tokens}, the process will continue to convert the val split.")
+            with MDSWriter(
+                columns=columns,
+                out=os.path.join(out_root, "val"),
+                compression=compression,
+            ) as out:
+                processed_tokens = 0
+                progress_bar = tqdm(total=val_tokens)
+                try:
+                    for sample in samples:
+                        processed_tokens += sample["num_tokens"]
+                        num_tokens = sample.pop("num_tokens")
+                        num_tokens = num_tokens.item() if isinstance(num_tokens, torch.Tensor) else num_tokens
+                        progress_bar.update(num_tokens)
+                        out.write(sample)
+                        if (
+                            val_tokens > 0
+                            and processed_tokens >= val_tokens
+                        ):
+                            print("Early stop due to --val_tokens")
+                            break
+                except Exception as e:
+                    print(f"Exception: {e}")
+                    print(f"Processed val {processed_tokens} tokens")
+
 
 
 def convert_dataset_hf_from_args(
@@ -480,6 +517,8 @@ def convert_dataset_hf_from_args(
     no_wrap: bool,
     num_workers: Optional[int],
     max_tokens: Optional[int] = None,
+    shuffle: bool = False,
+    val_tokens: int = 0,
 ) -> None:
     """A wrapper for `convert_dataset_hf` that parses arguments.
 
@@ -538,4 +577,6 @@ def convert_dataset_hf_from_args(
         no_wrap=no_wrap,
         num_workers=num_workers,
         max_tokens=max_tokens,
+        shuffle=shuffle,
+        val_tokens=val_tokens,
     )

@@ -42,6 +42,8 @@ def parse_args() -> Namespace:
     parser.add_argument('--no_wrap', default=False, action='store_true')
     parser.add_argument('--num_workers', type=int, required=False, default=None)
     parser.add_argument('--max_tokens', type=int, default=None, required=False)
+    parser.add_argument("--shuffle", default=False, action="store_true")
+    parser.add_argument('--val_tokens', type=int, default=0, required=False)
 
     parsed = parser.parse_args()
     return parsed
@@ -63,4 +65,6 @@ if __name__ == '__main__':
         no_wrap=args.no_wrap,
         num_workers=args.num_workers,
         max_tokens=args.max_tokens,
+        shuffle=args.shuffle,
+        val_tokens=args.val_tokens,
     )
