@@ -4,11 +4,13 @@
 CONDA_BASE=$(conda info --base)
 source $CONDA_BASE/bin/activate llm-foundry
 
+OUTPUT_FOLDER="/home/riccar_orlando/data/dolmino-mix-1124-50B/processed"
+
 # DCLM
 echo "Processing DCLM"
 python scripts/data_prep/convert_dataset_hf.py --dataset allenai/dolmino-mix-1124 \
     --data_subset dclm \
-    --out_root /home/riccar_orlando/data/dolmino-mix-1124-50B/processed/dclm \
+    --out_root $OUTPUT_FOLDER/dclm \
     --tokenizer meta-llama/Llama-3.1-8B-Instruct \
     --num_workers 16 \
     --splits train \
@@ -21,7 +23,7 @@ python scripts/data_prep/convert_dataset_hf.py --dataset allenai/dolmino-mix-112
 echo "Processing FLAN"
 python scripts/data_prep/convert_dataset_hf.py --dataset allenai/dolmino-mix-1124 \
     --data_subset flan \
-    --out_root /home/riccar_orlando/data/dolmino-mix-1124-50B/processed/flan \
+    --out_root $OUTPUT_FOLDER/flan \
     --tokenizer meta-llama/Llama-3.1-8B-Instruct \
     --num_workers 16 \
     --splits train \
@@ -34,7 +36,7 @@ python scripts/data_prep/convert_dataset_hf.py --dataset allenai/dolmino-mix-112
 echo "Processing PES20"
 python scripts/data_prep/convert_dataset_hf.py --dataset allenai/dolmino-mix-1124 \
     --data_subset pes2o \
-    --out_root /home/riccar_orlando/data/dolmino-mix-1124-50B/processed/pes2o \
+    --out_root $OUTPUT_FOLDER/pes2o \
     --tokenizer meta-llama/Llama-3.1-8B-Instruct \
     --num_workers 16 \
     --splits train \
@@ -48,7 +50,7 @@ echo "Processing Wikipedia"
 python scripts/data_prep/convert_dataset_hf.py \
     --dataset allenai/dolmino-mix-1124 \
     --data_subset wiki \
-    --out_root /home/riccar_orlando/data/dolmino-mix-1124-50B/processed/wiki \
+    --out_root $OUTPUT_FOLDER/wiki \
     --tokenizer meta-llama/Llama-3.1-8B-Instruct \
     --num_workers 16 \
     --splits train \
@@ -62,7 +64,7 @@ echo "Processing Stackexchange"
 python scripts/data_prep/convert_dataset_hf.py \
     --dataset allenai/dolmino-mix-1124 \
     --data_subset stackexchange \
-    --out_root /home/riccar_orlando/data/dolmino-mix-1124-50B/processed/stackexchange \
+    --out_root $OUTPUT_FOLDER/stackexchange \
     --tokenizer meta-llama/Llama-3.1-8B-Instruct \
     --num_workers 16 \
     --splits train \
@@ -76,7 +78,7 @@ echo "Processing Math"
 python scripts/data_prep/convert_dataset_hf.py \
     --dataset allenai/dolmino-mix-1124 \
     --data_subset math \
-    --out_root /home/riccar_orlando/data/dolmino-mix-1124-50B/processed/math \
+    --out_root $OUTPUT_FOLDER/math \
     --tokenizer meta-llama/Llama-3.1-8B-Instruct \
     --num_workers 16 \
     --splits train \
