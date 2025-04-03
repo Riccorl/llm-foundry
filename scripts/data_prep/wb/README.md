@@ -1,9 +1,10 @@
 # LLM Continual Pretraining with LLM-Foundry
 
-This is a quick reference for the scripts and tools used to continue pretraining LLMs with LLM-Foundry.
-The code here is meant to be run from the `llm-foundry` directory, and assumes you have a working environment with all dependencies installed.
+This document serves as a quick reference for the scripts and tools used to continue pretraining large language models (LLMs) with LLM-Foundry.
 
-This document is a work in progress, and will be updated as the project evolves.
+Ensure that you are running all commands from the `llm-foundry` directory and that your environment has all necessary dependencies installed.
+
+This document is a work in progress and will be updated as the project evolves to include new features, tools, and best practices.
 
 ## Installation
 
@@ -15,10 +16,12 @@ pip install -e ".[gpu]"
 
 ## Data Processing
 
-In this section, we will describe how to process the datasets for LLM-Foundry.
-We will use the `convert_dataset_hf.py` script to convert datasets from Hugging Face to the LLM-Foundry format.
-The script is modified to work with any dataset from Hugging Face, as well as with local (json/jsonl) files.
-However, samples need to be in the format of a dictionary with at lest `text` key:
+In this section, we will describe how to process datasets for use with LLM-Foundry.
+The relevant scripts are located in the `scripts/data_prep` folder.
+We will use the `convert_dataset_hf.py` script to convert datasets from Hugging Face into the LLM-Foundry format.
+
+The script has been modified to work with any dataset from Hugging Face, as well as local files in JSON or JSONL format. 
+However, each sample must be structured as a dictionary containing at least a `text` key, as shown below:
 
 ```json
 {
@@ -26,7 +29,9 @@ However, samples need to be in the format of a dictionary with at lest `text` ke
 }
 ```
 
-The output of the script is a set of files in [MDS](https://docs.mosaicml.com/projects/streaming/en/stable/preparing_datasets/dataset_format.html#mds) format.
+For wrapping local plain text files (e.g., parsed PDFs) into the required JSONL format, you can refer to the example code provided in `scripts/data_prep/wrap_to_jsonl.py`.
+
+The output of the `convert_dataset_hf.py` script is a set of files in the [MDS](https://docs.mosaicml.com/projects/streaming/en/stable/preparing_datasets/dataset_format.html#mds) format, which is optimized for efficient streaming and training.
 
 ### Dolmino
 
