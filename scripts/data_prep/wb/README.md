@@ -157,6 +157,10 @@ python scripts/data_prep/convert_dataset_hf.py \
     --shuffle
 ```
 
+### PDFs
+
+Number of pdfs: 675661
+
 ## Training
 
 In this section, we will describe how to train the model with LLM-Foundry.
