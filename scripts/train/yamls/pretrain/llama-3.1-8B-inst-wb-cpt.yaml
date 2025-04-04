@@ -1,12 +1,12 @@
 variables:
-  data_local: /home/riccar_orlando/data/dump1/processed/train
+  data_local: /home/riccar_orlando/data
   data_remote:  # If blank, files must be present in data_local
   max_seq_len: 8192
   global_seed: 17
   model_name: meta-llama/Llama-3.1-8B-Instruct
   tokenizer_name: meta-llama/Llama-3.1-8B-Instruct
   # Run Name
-  run_name:  llama3-8b-instruct-cpt-scihub
+  run_name:  llama3-8b-instruct-cpt-10B-dolmino-pdfs
 
 max_seq_len: ${variables.max_seq_len}
 run_name: ${variables.run_name}
@@ -14,9 +14,9 @@ run_name: ${variables.run_name}
 # Model
 model:
   name: hf_causal_lm
-  init_device: meta
+  init_device: cpu
   pretrained_model_name_or_path: ${variables.model_name}
-  pretrained: false
+  pretrained: true
   # Note: you must have set the HF_TOKEN environment variable and have access to the llama2 models
   use_auth_token: true
   use_flash_attention_2: true
@@ -31,12 +31,42 @@ tokenizer:
 train_loader:
   name: text
   dataset:
-    local: ${variables.data_local}
-    remote: ${variables.data_remote}
-    split: train_small
     shuffle: true
     max_seq_len: ${variables.max_seq_len}
     shuffle_seed: ${variables.global_seed}
+    streams:
+      # dolmino 5B
+      dclm: 
+        # current available tokens: 23_600_000_000
+        # needed tokens: 4_720_000_000
+        local: ${variables.data_local}/dolmino-mix-1124-50B/processed/dclm
+        split: train
+        repeat: 0.1
+      flan: # current available tokens: 8_300_000_000
+        local: ${variables.data_local}/dolmino-mix-1124-50B/processed/flan
+        split: train
+        repeat: 0.1
+      math: # current available tokens: 10400000000
+        local: ${variables.data_local}/dolmino-mix-1124-50B/processed/math
+        split: train
+        repeat: 0.1
+      pes2o: # current available tokens: 2925000000
+        local: ${variables.data_local}/dolmino-mix-1124-50B/processed/pes2o
+        split: train
+        repeat: 0.1
+      stackexchange: # current available tokens: 1225000000
+        local: ${variables.data_local}/dolmino-mix-1124-50B/processed/stackexchange
+        split: train
+        repeat: 0.1
+      wiki: # current available tokens: 3555000000
+        local: ${variables.data_local}/dolmino-mix-1124-50B/processed/wiki
+        split: train
+        repeat: 0.1
+      # pdfs 5B
+      pdfs: # current available tokens: 8_853_544_960
+        local: ${variables.data_local}/semantic-scholar-parsed-jsonl-en-processed
+        split: train
+        repeat: 1.77
   pin_memory: true
   prefetch_factor: 2
   persistent_workers: true
@@ -46,12 +76,40 @@ train_loader:
 eval_loader:
   name: text
   dataset:
-    local: ${variables.data_local}
-    remote: ${variables.data_remote}
-    split: val
     shuffle: false
     max_seq_len: ${variables.max_seq_len}
     shuffle_seed: ${variables.global_seed}
+    streams:
+      # dolmino
+      dclm:
+        local: ${variables.data_local}/dolmino-mix-1124-50B/processed/dclm
+        split: val
+        repeat: 0.5
+      flan:
+        local: ${variables.data_local}/dolmino-mix-1124-50B/processed/flan
+        split: val
+        repeat: 0.5
+      math:
+        local: ${variables.data_local}/dolmino-mix-1124-50B/processed/math
+        split: val
+        repeat: 0.5
+      pes2o:
+        local: ${variables.data_local}/dolmino-mix-1124-50B/processed/pes2o
+        split: val
+        repeat: 0.5
+      stackexchange:
+        local: ${variables.data_local}/dolmino-mix-1124-50B/processed/stackexchange
+        split: val
+        repeat: 0.5
+      wiki:
+        local: ${variables.data_local}/dolmino-mix-1124-50B/processed/wiki
+        split: val
+        repeat: 0.5
+      # pdfs
+      pdfs:
+        local: ${variables.data_local}/semantic-scholar-parsed-jsonl-en-processed
+        split: val
+        repeat: 0.25
   drop_last: false
   num_workers: 8
 
@@ -62,13 +120,13 @@ scheduler:
   alpha_f: 0.1
 
 optimizer:
-  name: decoupled_adamw
-  lr: 6.0e-4
+  name: adamw
+  lr: 3.0e-4
   betas:
   - 0.9
   - 0.95
   eps: 1.0e-08
-  weight_decay: 0.0
+  weight_decay: 0.1
 
 algorithms:
   gradient_clipping:
@@ -77,8 +135,8 @@ algorithms:
 
 # max_duration = num_tokens / (max_seq_len * global_train_batch_size)
 # number of tokens per batch = max_seq_len * global_train_batch_size
-max_duration: 50ba
-eval_interval: 500ba
+max_duration: 2400ba
+eval_interval: 240ba
 eval_first: false
 global_train_batch_size: 512
 
@@ -94,7 +152,7 @@ fsdp_config:
   mixed_precision: PURE
   state_dict_type: sharded
   limit_all_gathers: true
-  sharding_strategy: NO_SHARD # HYBRID_SHARD
+  sharding_strategy: FULL_SHARD # HYBRID_SHARD
   backward_prefetch: BACKWARD_PRE
   activation_cpu_offload: false
   activation_checkpointing: false
@@ -117,12 +175,12 @@ loggers:
     entity: "riccorl"
     project: "wb-llm-cpt"
     init_kwargs:
-      mode: "online"
-      # id: ${run_name}
+      mode: "offline"
+      id: ${run_name}
       dir: /home/riccar_orlando/training_logs/{run_name}
 
 # Checkpoint to local filesystem or remote object store
-save_interval: 500ba
+save_interval: 240ba
 save_num_checkpoints_to_keep: -1 # Important, this cleans up checkpoints saved to DISK
 save_folder: /home/riccar_orlando/runs/{run_name}
 # save_folder: s3://my-bucket/my-folder/{run_name}/checkpoints
@@ -137,20 +195,18 @@ autoresume: False
 icl_tasks:
 -
   label: arc_easy
-  dataset_uri: eval/local_data/world_knowledge/arc_easy.jsonl
+  dataset_uri: ../eval/local_data/world_knowledge/arc_easy.jsonl
   num_fewshot: [3]
   icl_task_type: multiple_choice
   continuation_delimiter: "\nAnswer: "
 -
   label: arc_challenge
-  dataset_uri: eval/local_data/world_knowledge/arc_challenge.jsonl
+  dataset_uri: ../eval/local_data/world_knowledge/arc_challenge.jsonl
   num_fewshot: [3, 25]
   icl_task_type: multiple_choice
   continuation_delimiter: "\nAnswer: "
 -
-  label: mmlu
-  dataset_uri: eval/local_data/world_knowledge/mmlu.jsonl
-  num_fewshot: [5]
+  label: hellaswag
+  dataset_uri: ../eval/local_data/language_understanding/hellaswag.jsonl  # ADD YOUR OWN DATASET URI
+  num_fewshot: [10]
   icl_task_type: multiple_choice
-  continuation_delimiter: "\nAnswer: "
-  has_categories: true

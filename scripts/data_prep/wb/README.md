@@ -20,7 +20,7 @@ In this section, we will describe how to process datasets for use with LLM-Found
 The relevant scripts are located in the `scripts/data_prep` folder.
 We will use the `convert_dataset_hf.py` script to convert datasets from Hugging Face into the LLM-Foundry format.
 
-The script has been modified to work with any dataset from Hugging Face, as well as local files in JSON or JSONL format. 
+The script has been modified to work with any dataset from Hugging Face, as well as local files in JSON or JSONL format.
 However, each sample must be structured as a dictionary containing at least a `text` key, as shown below:
 
 ```json
@@ -165,6 +165,8 @@ Number of pdfs after language filtering (fasttext, en, threshold >= 0.65): 52795
 
 Datatrove pipeline: ~6000 seconds total runtime -> ~8ms per document
 
+Number of tokens: 8_853_544_960
+
 ```python
 import psutil
 
@@ -201,6 +203,21 @@ executor.run()
 In this section, we will describe how to train the model with LLM-Foundry.
 We will use the `train.py` script to train the model, wrapping it with `compose` for distributed training.
 
+### 10B Experiment (5B dolmino + 5B pdfs)
+
+Number of available Tokens from Dolmino Mix: 50B
+
+| Dataset       | Proportion |
+| ------------- | ---------- |
+| DCLM          | 0.472      |
+| Flan          | 0.166      |
+| PES2O         | 0.0585     |
+| Wiki          | 0.0711     |
+| Stackexchange | 0.0245     |
+| Math          | 0.208      |
+
+
 ```bash
-compose train.py
+cd scripts/train
+compose train.py yamls/pretrain/llama-3.2-1B-inst-wb-cpt.yaml
 ```
