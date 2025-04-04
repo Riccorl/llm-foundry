@@ -24,8 +24,8 @@ from llmfoundry.utils.builders import build_tokenizer
 
 
 class ConcatMode(Enum):
-    NO_CONCAT = 'NO_CONCAT'
-    CONCAT_TOKENS = 'CONCAT_TOKENS'
+    NO_CONCAT = "NO_CONCAT"
+    CONCAT_TOKENS = "CONCAT_TOKENS"
 
 
 @dataclass
@@ -51,8 +51,8 @@ class TrainSmallConstants(DataSplitConstants):
 
     def __init__(
         self,
-        hf_split: str = 'train',
-        folder_split: str = 'train_small',
+        hf_split: str = "train",
+        folder_split: str = "train_small",
         raw_samples: int = 100000,
         truncated_samples: int = 100000,
     ):
@@ -63,8 +63,8 @@ class ValSmallConstants(DataSplitConstants):
 
     def __init__(
         self,
-        hf_split: str = 'validation',
-        folder_split: str = 'val_small',
+        hf_split: str = "validation",
+        folder_split: str = "val_small",
         raw_samples: int = 10000,
         truncated_samples: int = 10000,
     ):
@@ -75,8 +75,8 @@ class ValXSmallConstants(DataSplitConstants):
 
     def __init__(
         self,
-        hf_split: str = 'validation',
-        folder_split: str = 'val_xsmall',
+        hf_split: str = "validation",
+        folder_split: str = "val_xsmall",
         raw_samples: int = 3000,
         truncated_samples: int = 3000,
     ):
@@ -87,33 +87,33 @@ pileconstants = DatasetConstants(
     chars_per_sample=6212,  # Computed over validation set
     chars_per_token=4,  # OpenAI estimate
 )
-pileconstants.splits['train'] = DataSplitConstants(
-    hf_split='train',
-    folder_split='train',
+pileconstants.splits["train"] = DataSplitConstants(
+    hf_split="train",
+    folder_split="train",
     raw_samples=210607728,
     truncated_samples=None,
 )
-pileconstants.splits['train_small'] = DataSplitConstants(
-    hf_split='train',
-    folder_split='train_small',
+pileconstants.splits["train_small"] = DataSplitConstants(
+    hf_split="train",
+    folder_split="train_small",
     raw_samples=100000,
     truncated_samples=100000,
 )
-pileconstants.splits['val'] = DataSplitConstants(
-    hf_split='validation',
-    folder_split='val',
+pileconstants.splits["val"] = DataSplitConstants(
+    hf_split="validation",
+    folder_split="val",
     raw_samples=214670,
     truncated_samples=None,
 )
-pileconstants.splits['val_small'] = DataSplitConstants(
-    hf_split='validation',
-    folder_split='val_small',
+pileconstants.splits["val_small"] = DataSplitConstants(
+    hf_split="validation",
+    folder_split="val_small",
     raw_samples=10000,
     truncated_samples=10000,
 )
-pileconstants.splits['val_xsmall'] = DataSplitConstants(
-    hf_split='validation',
-    folder_split='val_xsmall',
+pileconstants.splits["val_xsmall"] = DataSplitConstants(
+    hf_split="validation",
+    folder_split="val_xsmall",
     raw_samples=3000,
     truncated_samples=3000,
 )
@@ -122,39 +122,39 @@ c4constants = DatasetConstants(
     chars_per_sample=2163,  # Computed over validation set
     chars_per_token=4,  # OpenAI estimate
 )
-c4constants.splits['train'] = DataSplitConstants(
-    hf_split='train',
-    folder_split='train',
+c4constants.splits["train"] = DataSplitConstants(
+    hf_split="train",
+    folder_split="train",
     raw_samples=364868892,
     truncated_samples=None,
 )
-c4constants.splits['train_small'] = DataSplitConstants(
-    hf_split='train',
-    folder_split='train_small',
+c4constants.splits["train_small"] = DataSplitConstants(
+    hf_split="train",
+    folder_split="train_small",
     raw_samples=100000,
     truncated_samples=100000,
 )
-c4constants.splits['val'] = DataSplitConstants(
-    hf_split='validation',
-    folder_split='val',
+c4constants.splits["val"] = DataSplitConstants(
+    hf_split="validation",
+    folder_split="val",
     raw_samples=364608,
     truncated_samples=None,
 )
-c4constants.splits['val_small'] = DataSplitConstants(
-    hf_split='validation',
-    folder_split='val_small',
+c4constants.splits["val_small"] = DataSplitConstants(
+    hf_split="validation",
+    folder_split="val_small",
     raw_samples=10000,
     truncated_samples=10000,
 )
-c4constants.splits['val_xsmall'] = DataSplitConstants(
-    hf_split='validation',
-    folder_split='val_xsmall',
+c4constants.splits["val_xsmall"] = DataSplitConstants(
+    hf_split="validation",
+    folder_split="val_xsmall",
     raw_samples=3000,
     truncated_samples=3000,
 )
-c4constants.splits['val_xxsmall'] = DataSplitConstants(
-    hf_split='validation',
-    folder_split='val_xxsmall',
+c4constants.splits["val_xxsmall"] = DataSplitConstants(
+    hf_split="validation",
+    folder_split="val_xxsmall",
     raw_samples=100,
     truncated_samples=100,
 )
@@ -167,8 +167,8 @@ def build_hf_dataset(
     split: str,
     mode: ConcatMode,
     max_length: Optional[int] = None,
-    bos_text: str = '',
-    eos_text: str = '',
+    bos_text: str = "",
+    eos_text: str = "",
     no_wrap: bool = False,
     tokenizer: PreTrainedTokenizerBase = None,
     data_subset: Union[str, None] = None,
@@ -197,12 +197,16 @@ def build_hf_dataset(
         An IterableDataset.
     """
     is_local = os.path.exists(dataset_name)
+    print("Dataset name:", dataset_name)
+    print("Is local:", is_local)
     if is_local:
         if os.path.isdir(dataset_name):
             # search in all subfolders
             if file_pattern is None:
                 file_pattern = "*"
-            data_files = glob(f"{dataset_name}/**/{file_pattern}.{data_type}", recursive=True)
+            data_files = glob(
+                f"{dataset_name}/**/{file_pattern}.{data_type}", recursive=True
+            )
         else:
             data_files = dataset_name
 
@@ -218,9 +222,12 @@ def build_hf_dataset(
         )
     else:
         hf_dataset = hf_datasets.load_dataset(
-            path=dataset_name, name=data_subset, split=split, streaming=streaming,
+            path=dataset_name,
+            name=data_subset,
+            split=split,
+            streaming=streaming,
         )
-    
+
     if shuffle:
         print("Shuffling dataset")
         hf_dataset = hf_dataset.shuffle(seed=seed)
@@ -236,20 +243,25 @@ def build_hf_dataset(
     else:
         if not isinstance(tokenizer, PreTrainedTokenizerBase):
             raise ValueError(
-                f'{tokenizer=} must be of type PreTrainedTokenizerBase',
+                f"{tokenizer=} must be of type PreTrainedTokenizerBase",
             )
         if max_length is None:
-            raise ValueError(f'max_length must be set.')
-        if bos_text + eos_text == '':
-            test_tokens = tokenizer('test')
-            if test_tokens['input_ids'][
-                0] != tokenizer.bos_token_id and test_tokens['input_ids'][
-                    -1] != tokenizer.eos_token_id:
-                tok_error_msg = 'This tokenizer does not insert an EOS nor BOS token. '
-                tok_error_msg += 'Concatenating with this tokenizer will result in sequences being '
-                tok_error_msg += 'attached without a separating token. Please use another tokenizer, '
-                tok_error_msg += 'such as facebook/opt-125m, or specify EOS/BOS text with e.g. '
-                tok_error_msg += '--bos_text=<|endoftext|>.'
+            raise ValueError(f"max_length must be set.")
+        if bos_text + eos_text == "":
+            test_tokens = tokenizer("test")
+            if (
+                test_tokens["input_ids"][0] != tokenizer.bos_token_id
+                and test_tokens["input_ids"][-1] != tokenizer.eos_token_id
+            ):
+                tok_error_msg = "This tokenizer does not insert an EOS nor BOS token. "
+                tok_error_msg += (
+                    "Concatenating with this tokenizer will result in sequences being "
+                )
+                tok_error_msg += "attached without a separating token. Please use another tokenizer, "
+                tok_error_msg += (
+                    "such as facebook/opt-125m, or specify EOS/BOS text with e.g. "
+                )
+                tok_error_msg += "--bos_text=<|endoftext|>."
                 raise ValueError(tok_error_msg)
         dataset = ConcatTokensDataset(
             hf_dataset=hf_dataset,
@@ -283,7 +295,7 @@ def build_dataloader(
 ) -> DataLoader:
     if num_workers is None:
         # Multiple workers is only supported on linux machines
-        if 'linux' or 'macos' in platform.platform().lower():
+        if "linux" or "macos" in platform.platform().lower():
             num_workers = max(1, psutil.cpu_count())
         else:
             num_workers = 0
@@ -292,10 +304,14 @@ def build_dataloader(
     # the aggregate device batch size
     # If not using workers, the torch DataLoader expects the default value for prefetch_factor,
     # which non-intuitively must be 2.
-    prefetch_factor = max(
-        1,
-        2 * batch_size // num_workers,
-    ) if num_workers > 0 else 2
+    prefetch_factor = (
+        max(
+            1,
+            2 * batch_size // num_workers,
+        )
+        if num_workers > 0
+        else 2
+    )
 
     return DataLoader(
         dataset=dataset,
@@ -328,8 +344,7 @@ def generate_samples(
                 return
             n_samples += 1
             yield {
-                k:
-                v[idx].numpy() if isinstance(v[idx], torch.Tensor) else v[idx]
+                k: v[idx].numpy() if isinstance(v[idx], torch.Tensor) else v[idx]
                 for k, v in batch.items()
             }
 
@@ -382,11 +397,11 @@ def convert_dataset_hf(
         built_tokenizer = build_tokenizer(tokenizer, tokenizer_kwargs)
         # we will enforce length, so suppress warnings about sequences too long for the model
         built_tokenizer.model_max_length = int(1e30)
-        columns = {'tokens': 'ndarray:int32'}
+        columns = {"tokens": "ndarray:int32"}
     else:
         mode = ConcatMode.NO_CONCAT
         built_tokenizer = None
-        columns = {'text': 'str'}
+        columns = {"text": "str"}
 
     for split_name in splits:
         # try:
@@ -436,10 +451,47 @@ def convert_dataset_hf(
         #     denominator = None
 
         # Write samples
-        print(f'Converting {dataset} to MDS format...')
+        print(f"Converting {dataset} to MDS format...")
         print(
-            f'Note: the progress bar is based on the dataset length before tokenization, and may finish at a value before 100%.',
+            f"Note: the progress bar is based on the dataset length before tokenization, and may finish at a value before 100%.",
         )
+
+        if val_tokens > 0:
+            if split_name == "train":
+                print(
+                    f"`val_tokens` is set to {val_tokens}, but `split_name` is `train`.",
+                    "We will sample a validation set from the training split.",
+                )
+            else:
+                raise ValueError(
+                    f"`val_tokens` is set to {val_tokens}, but `split_name` is {split_name}.",
+                    "Please set `split_name` to `train` to use `--val_tokens`.",
+                )
+            with MDSWriter(
+                columns=columns,
+                out=os.path.join(out_root, "val"),
+                compression=compression,
+            ) as out:
+                processed_tokens = 0
+                progress_bar = tqdm(total=val_tokens)
+                try:
+                    for sample in samples:
+                        processed_tokens += sample["num_tokens"]
+                        num_tokens = sample.pop("num_tokens")
+                        num_tokens = (
+                            num_tokens.item()
+                            if isinstance(num_tokens, torch.Tensor)
+                            else num_tokens
+                        )
+                        progress_bar.update(num_tokens)
+                        out.write(sample)
+                        if val_tokens > 0 and processed_tokens >= val_tokens:
+                            print("Early stop due to --val_tokens")
+                            break
+                except Exception as e:
+                    print(f"Exception: {e}")
+                    print(f"Processed val {processed_tokens} tokens")
+
         with MDSWriter(
             columns=columns,
             out=os.path.join(out_root, split_name),
@@ -461,46 +513,19 @@ def convert_dataset_hf(
                 for sample in samples:
                     processed_tokens += sample["num_tokens"]
                     num_tokens = sample.pop("num_tokens")
-                    num_tokens = num_tokens.item() if isinstance(num_tokens, torch.Tensor) else num_tokens
+                    num_tokens = (
+                        num_tokens.item()
+                        if isinstance(num_tokens, torch.Tensor)
+                        else num_tokens
+                    )
                     progress_bar.update(num_tokens)
                     out.write(sample)
-                    if (
-                        max_tokens is not None
-                        and processed_tokens >= max_tokens
-                    ):
+                    if max_tokens is not None and processed_tokens >= max_tokens:
                         print("Early stop due to --max_tokens")
                         break
             except Exception as e:
                 print(f"Exception: {e}")
                 print(f"Processed {processed_tokens} tokens")
-        
-
-        if val_tokens > 0:
-            print(f"`val_tokens` is set to {val_tokens}, the process will continue to convert the val split.")
-            with MDSWriter(
-                columns=columns,
-                out=os.path.join(out_root, "val"),
-                compression=compression,
-            ) as out:
-                processed_tokens = 0
-                progress_bar = tqdm(total=val_tokens)
-                try:
-                    for sample in samples:
-                        processed_tokens += sample["num_tokens"]
-                        num_tokens = sample.pop("num_tokens")
-                        num_tokens = num_tokens.item() if isinstance(num_tokens, torch.Tensor) else num_tokens
-                        progress_bar.update(num_tokens)
-                        out.write(sample)
-                        if (
-                            val_tokens > 0
-                            and processed_tokens >= val_tokens
-                        ):
-                            print("Early stop due to --val_tokens")
-                            break
-                except Exception as e:
-                    print(f"Exception: {e}")
-                    print(f"Processed val {processed_tokens} tokens")
-
 
 
 def convert_dataset_hf_from_args(
@@ -540,7 +565,7 @@ def convert_dataset_hf_from_args(
         ValueError: If the output directory already contains the requested splits
         ValueError: If `concat_tokens` is set but `tokenizer` is not
     """
-    os.environ['WORLD_SIZE'] = '1'
+    os.environ["WORLD_SIZE"] = "1"
     if tokenizer_kwargs:
         parsed_tokenizer_kwargs = json.loads(tokenizer_kwargs)
     else:
@@ -555,11 +580,12 @@ def convert_dataset_hf_from_args(
 
     # Make sure we have needed concat options
     if (
-        concat_tokens is not None and isinstance(concat_tokens, int) and
-        tokenizer is None
+        concat_tokens is not None
+        and isinstance(concat_tokens, int)
+        and tokenizer is None
     ):
         raise ValueError(
-            'When setting --concat_tokens, you must specify a --tokenizer',
+            "When setting --concat_tokens, you must specify a --tokenizer",
         )
 
     # now that we have validated them, change BOS/EOS to strings and convert
@@ -572,8 +598,8 @@ def convert_dataset_hf_from_args(
         concat_tokens=concat_tokens,
         tokenizer=tokenizer,
         tokenizer_kwargs=parsed_tokenizer_kwargs,
-        bos_text=bos_text if bos_text else '',
-        eos_text=eos_text if eos_text else '',
+        bos_text=bos_text if bos_text else "",
+        eos_text=eos_text if eos_text else "",
         no_wrap=no_wrap,
         num_workers=num_workers,
         max_tokens=max_tokens,
