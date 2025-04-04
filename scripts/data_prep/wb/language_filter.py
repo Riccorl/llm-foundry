@@ -25,7 +25,7 @@ if __name__ == "__main__":
         default="en",
         help="Comma-separated list of languages",
     )
-    arg_parser.add_argument("--threshold", type=float, default=0.95)
+    arg_parser.add_argument("--threshold", type=float, default=0.65)
     arg_parser.add_argument("--tasks", type=int, default=1)
     arg_parser.add_argument("--workers", type=int, default=-1)
     arg_parser.add_argument("--logging_dir", type=str, default="logs/")

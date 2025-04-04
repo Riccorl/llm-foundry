@@ -161,6 +161,41 @@ python scripts/data_prep/convert_dataset_hf.py \
 
 Number of pdfs: 675661
 
+Number of pdfs after language filtering (fasttext, en, threshold >= 0.65): 527958
+
+Datatrove pipeline: ~6000 seconds total runtime -> ~8ms per document
+
+```python
+import psutil
+
+from datatrove.executor import LocalPipelineExecutor
+from datatrove.pipeline.filters import LanguageFilter
+from datatrove.pipeline.readers import JsonlReader
+from datatrove.pipeline.writers import JsonlWriter
+
+input_folder = "..."
+output_folder = "..."
+logging_dir = "..."
+languages = ["en"]
+threshold = 0.65
+workers = psutil.cpu_count()
+tasks = 1_000
+
+pipeline = [
+    JsonlReader(data_folder=input_folder, file_progress=True),
+    LanguageFilter(languages=languages, language_threshold=threshold),
+    JsonlWriter(output_folder=output_folder, compression=None),
+]
+
+executor = LocalPipelineExecutor(
+    pipeline=pipeline,
+    logging_dir=logging_dir,
+    tasks=tasks,
+    workers=workers,
+)
+executor.run()
+```
+
 ## Training
 
 In this section, we will describe how to train the model with LLM-Foundry.
