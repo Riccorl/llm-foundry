@@ -14,13 +14,12 @@ run_name: ${variables.run_name}
 # Model
 model:
   name: hf_causal_lm
-  init_device: meta
+  init_device: cpu
   pretrained_model_name_or_path: ${variables.model_name}
   pretrained: true
   # Note: you must have set the HF_TOKEN environment variable and have access to the llama2 models
   use_auth_token: true
   use_flash_attention_2: true
-  # attn_implementation: flash_attention_2
 
 # Tokenizer
 tokenizer:
@@ -92,7 +91,7 @@ algorithms:
 # 2384 / 4194304
 # number of tokens per batch = max_seq_len * global_train_batch_size
 max_duration: 2400ba
-eval_interval: 500ba
+eval_interval: 2ba
 eval_first: false
 global_train_batch_size: 512
 
@@ -104,15 +103,15 @@ dist_timeout: 6000
 expandable_segments: true
 
 # FSDP
-# fsdp_config:
-#   mixed_precision: PURE
-#   state_dict_type: sharded
-#   limit_all_gathers: true
-#   sharding_strategy: FULL_SHARD # HYBRID_SHARD
-#   backward_prefetch: BACKWARD_PRE
-#   activation_cpu_offload: false
-#   activation_checkpointing: false
-#   activation_checkpointing_reentrant: false
+fsdp_config:
+  mixed_precision: PURE
+  state_dict_type: sharded
+  limit_all_gathers: true
+  sharding_strategy: FULL_SHARD # HYBRID_SHARD
+  backward_prefetch: BACKWARD_PRE
+  activation_cpu_offload: false
+  activation_checkpointing: false
+  activation_checkpointing_reentrant: false
 
 # Logging
 progress_bar: false
@@ -162,9 +161,7 @@ icl_tasks:
   icl_task_type: multiple_choice
   continuation_delimiter: "\nAnswer: "
 -
-  label: mmlu
-  dataset_uri: ../eval/local_data/world_knowledge/mmlu.jsonl
-  num_fewshot: [5]
+  label: hellaswag
+  dataset_uri: ../eval/local_data/language_understanding/hellaswag.jsonl  # ADD YOUR OWN DATASET URI
+  num_fewshot: [10]
   icl_task_type: multiple_choice
-  continuation_delimiter: "\nAnswer: "
-  has_categories: true
